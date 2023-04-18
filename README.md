@@ -36,7 +36,7 @@ NimbleOpticAdapter is a Kubernetes operator that automates certificate renewal m
 ### Step 1: Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/NimbleOpticAdapter.git
+git clone https://github.com/uri-tech/NimbleOpticAdapter.git
 cd NimbleOpticAdapter
 ```
 
