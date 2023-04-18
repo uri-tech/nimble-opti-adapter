@@ -96,10 +96,12 @@ NimbleOpticAdapter is licensed under the Apache License, Version 2.0.
 
 ## Support
 
-For any questions, bug reports, or feature requests, please open an issue on our [GitHub repository](https://github.com/yourusername/NimbleOpticAdapter/issues)
+For any questions, bug reports, or feature requests, please open an issue on our [GitHub repository](https://github.com/uri-tech/NimbleOpticAdapter/issues)
 
 <!-- ## Attribution
 
 ### Images
 
 Diagram: [Unsplash](https://unsplash.com/photos/U9s5m5L2Gn0) (License: CC0) -->
+
+<!-- git pull --allow-unrelated-histories https://github.com/uri-tech/NimbleOpticAdapter main -->
