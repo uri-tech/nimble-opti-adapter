@@ -25,11 +25,14 @@ import (
 
 // NimbleOpticAdapterConfigSpec defines the desired state of NimbleOpticAdapterConfig
 type NimbleOpticAdapterConfigSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of NimbleOpticAdapterConfig. Edit nimbleopticadapterconfig_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	// TargetNamespace is the namespace where the operator should manage certificates
+	TargetNamespace string `json:"targetNamespace"`
+	// CertificateRenewalThreshold is the waiting time (in days) before the certificate expires to trigger renewal
+	CertificateRenewalThreshold int `json:"certificateRenewalThreshold"`
+	// AnnotationRemovalDelay is the delay (in seconds) after removing the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation before re-adding it
+	AnnotationRemovalDelay int `json:"annotationRemovalDelay"`
+	// RenewalCheckInterval is the interval (in minutes) for checking certificate renewals
+	RenewalCheckInterval int `json:"renewalCheckInterval"`
 }
 
 // NimbleOpticAdapterConfigStatus defines the observed state of NimbleOpticAdapterConfig

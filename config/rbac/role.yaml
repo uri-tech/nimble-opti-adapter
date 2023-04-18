@@ -1,0 +1,33 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - config.nimbleopticadapter.tech-ua.com
+  resources:
+  - nimbleopticadapterconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.nimbleopticadapter.tech-ua.com
+  resources:
+  - nimbleopticadapterconfigs/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - config.nimbleopticadapter.tech-ua.com
+  resources:
+  - nimbleopticadapterconfigs/status
+  verbs:
+  - get
+  - patch
+  - update
