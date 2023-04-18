@@ -1,0 +1,31 @@
+# permissions for end users to edit nimbleopticadapterconfigs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: nimbleopticadapterconfig-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: nimbleoptiadapter
+    app.kubernetes.io/part-of: nimbleoptiadapter
+    app.kubernetes.io/managed-by: kustomize
+  name: nimbleopticadapterconfig-editor-role
+rules:
+- apiGroups:
+  - config.nimbleopticadapter.tech-ua.com
+  resources:
+  - nimbleopticadapterconfigs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - config.nimbleopticadapter.tech-ua.com
+  resources:
+  - nimbleopticadapterconfigs/status
+  verbs:
+  - get
