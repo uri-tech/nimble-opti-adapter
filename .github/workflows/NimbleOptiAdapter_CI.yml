@@ -41,7 +41,7 @@ jobs:
           docker run --rm --privileged tonistiigi/binfmt --install all
           docker buildx create --use
           DOCKER_TARGET_PLATFORM="linux/arm64,linux/amd64"
-          docker buildx build ./* --platform $DOCKER_TARGET_PLATFORM \
+          docker buildx build . --platform $DOCKER_TARGET_PLATFORM \
           --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
           --build-arg VCS_REF=$(git rev-parse --short HEAD) \
           --build-arg VERSION=0.1 \
