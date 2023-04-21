@@ -42,18 +42,9 @@ jobs:
           docker buildx create --use
           DOCKER_TARGET_PLATFORM="linux/arm64,linux/amd64"
           docker buildx build ./* --platform $DOCKER_TARGET_PLATFORM \
+          --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+          --build-arg VCS_REF=$(git rev-parse --short HEAD) \
+          --build-arg VERSION=0.1 \
           --tag urial1500/nimble-opti-adapter:$IMAGE_TAG --tag urial1500/nimble-opti-adapter:latest  \
           --file ./Dockerfile \
           --output type=image,push=true
-
-    # - name: Deploy to k8s cluster.
-    #   env:
-    #     # cat /mnt/c/bgu/nimble-opti-adapter/DOC/simulation/kubecofig-nimble-opti-adapter | base64
-    #     KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
-    #   run: |
-    #     mkdir -p $HOME/.kube/
-    #     echo "$KUBE_CONFIG" | base64 -d > $HOME/.kube/config
-    #     kubectl apply -f yml/analysis-server.yml
-    #     kubectl -n nimble-opti-adapter patch deployment "deployment-nimble-opti-adapter" -p \
-    #     "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"`date +'%s'`\"}}}}}"
-    #     kubectl -n nimble-opti-adapter rollout restart deployment "deployment-nimble-opti-adapter"
