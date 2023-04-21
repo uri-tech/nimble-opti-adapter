@@ -41,9 +41,9 @@ jobs:
           docker run --rm --privileged tonistiigi/binfmt --install all
           docker buildx create --use
           DOCKER_TARGET_PLATFORM="linux/arm64,linux/amd64"
-          docker buildx build ./NimbleOptiAdapter --platform $DOCKER_TARGET_PLATFORM \
+          docker buildx build ./* --platform $DOCKER_TARGET_PLATFORM \
           --tag urial1500/nimble-opti-adapter:$IMAGE_TAG --tag urial1500/nimble-opti-adapter:latest  \
-          --file ./NimbleOptiAdapter/Dockerfile \
+          --file ./Dockerfile \
           --output type=image,push=true
 
     # - name: Deploy to k8s cluster.

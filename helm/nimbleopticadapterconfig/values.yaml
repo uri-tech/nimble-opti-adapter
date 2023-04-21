@@ -3,9 +3,9 @@
 replicaCount: 1
 
 image:
-  repository: <your-operator-image-repository>
+  repository: "urial1500/nimble-opti-adapter"
   pullPolicy: IfNotPresent
-  tag: ""
+  tag: "latest"
 
 imagePullSecrets: []
 nameOverride: ""
