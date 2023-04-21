@@ -4,7 +4,7 @@
   <img src="https://example.com/icon.png" alt="NimbleOpticAdapter Icon" width="80" height="80">
 </p> -->
 
-NimbleOpticAdapter is a Kubernetes operator that automates certificate renewal management when using `cert-manager.io/cluster-issuer` for services that require TLS communication. This operator is designed to work seamlessly with the NGINX ingress controller, efficiently handling the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation.
+NimbleOpticAdapter is a Kubernetes operator that automates certificate renewal management when using ingress with the annotation `cert-manager.io/cluster-issuer` for services that require TLS communication. This operator is designed to work seamlessly with the NGINX ingress controller, efficiently handling the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation.
 
 <!-- ![NimbleOpticAdapter Diagram](diagram.png) -->
 
@@ -43,12 +43,26 @@ cd NimbleOpticAdapter
 ### Step 2: Install the operator using Helm
 
 ```bash
-helm install nimbleopticadapter ./chart
+helm install nimbleopticadapter ./helm/nimbleopticadapterconfig
+```
+
+### Step 3: Modify the operator
+
+To modify the operator, edit the Helm chart templates or values.yaml file in the helm/nimbleopticadapterconfig directory.
+
+### Step 4: Update the operator using Helm
+
+Repackage the Helm chart and upgrade the release with the following commands:
+
+```bash
+cd NimbleOpticAdapter/helm/
+helm package nimbleopticadapterconfig
+helm upgrade nimbleopticadapter ./nimbleopticadapterconfig-0.1.0.tgz
 ```
 
 ## Configuration
 
-Edit the `values.yaml` file in the `chart` directory to customize the following parameters:
+Edit the `values.yaml` file in the `helm/nimbleopticadapterconfig` directory to customize the following parameters:
 
 - `labelSelector`: The label selector for namespaces the operator will manage certificates in (default: `nimble.optic.adapter/enabled: 'true'`)
 - `certificateRenewalThreshold`: The waiting time (in days) before the certificate expires to trigger renewal
@@ -105,7 +119,5 @@ For any questions, bug reports, or feature requests, please open an issue on our
 Diagram: [Unsplash](https://unsplash.com/photos/U9s5m5L2Gn0) (License: CC0) -->
 
 <!-- git pull --allow-unrelated-histories https://github.com/uri-tech/NimbleOpticAdapter main -->
-
-
 
 <!-- kubebuilder init --domain nimbleopticadapter.tech-ua.com --repo github.com/uri-tech/NimbleOpticAdapter -->

@@ -1,3 +1,5 @@
+// nimbleopticadapterconfig_controller.go
+
 /*
 Copyright 2023.
 
@@ -47,10 +49,31 @@ type NimbleOpticAdapterConfigReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 func (r *NimbleOpticAdapterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	// Step 1: Get the NimbleOpticAdapterConfig custom resource
+	config := &configv1alpha1.NimbleOpticAdapterConfig{}
+	if err := r.Get(ctx, req.NamespacedName, config); err != nil {
+		log.Error(err, "unable to fetch NimbleOpticAdapterConfig")
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
 
+	// Step 2: Retrieve the relevant certificates and their expiration dates
+	// This will depend on how you store and manage your certificates
+
+	// Step 3: Determine if any certificate needs renewal
+	// Compare the expiration dates with the CertificateRenewalThreshold from the config
+
+	// Step 4: Renew the certificates if necessary
+	// You'll need to implement the actual renewal logic based on your certificate management system
+
+	// Step 5: Update the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation
+	// This will involve updating the Ingress resources with the specified annotation based on the AnnotationRemovalDelay from the config
+
+	// Step 6: Set the status and conditions of the NimbleOpticAdapterConfig custom resource
+	// Update the status of the custom resource to reflect the current state
+
+	// Finally, return the ctrl.Result{} and any error if applicable
 	return ctrl.Result{}, nil
 }
 

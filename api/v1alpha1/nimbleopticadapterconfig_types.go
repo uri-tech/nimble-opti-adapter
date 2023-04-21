@@ -1,3 +1,5 @@
+// nimbleopticadapterconfig_types.go
+
 /*
 Copyright 2023.
 
@@ -20,25 +22,29 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // NimbleOpticAdapterConfigSpec defines the desired state of NimbleOpticAdapterConfig
 type NimbleOpticAdapterConfigSpec struct {
 	// TargetNamespace is the namespace where the operator should manage certificates
+	// +kubebuilder:validation:MinLength=1
 	TargetNamespace string `json:"targetNamespace"`
+
 	// CertificateRenewalThreshold is the waiting time (in days) before the certificate expires to trigger renewal
+	// +kubebuilder:validation:Minimum=1
 	CertificateRenewalThreshold int `json:"certificateRenewalThreshold"`
+
 	// AnnotationRemovalDelay is the delay (in seconds) after removing the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation before re-adding it
+	// +kubebuilder:validation:Minimum=1
 	AnnotationRemovalDelay int `json:"annotationRemovalDelay"`
+
 	// RenewalCheckInterval is the interval (in minutes) for checking certificate renewals
+	// +kubebuilder:validation:Minimum=1
 	RenewalCheckInterval int `json:"renewalCheckInterval"`
 }
 
 // NimbleOpticAdapterConfigStatus defines the observed state of NimbleOpticAdapterConfig
 type NimbleOpticAdapterConfigStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Conditions are the conditions for this resource.
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 //+kubebuilder:object:root=true

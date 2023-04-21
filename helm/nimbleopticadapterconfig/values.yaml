@@ -1,0 +1,21 @@
+# values.yaml
+
+replicaCount: 1
+
+image:
+  repository: <your-operator-image-repository>
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+resources: {}

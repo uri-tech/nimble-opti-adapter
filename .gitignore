@@ -1,13 +1,15 @@
+# 
+*secret*
 
 # Binaries for programs and plugins
-# *.exe
-# *.exe~
-# *.dll
-# *.so
-# *.dylib
-# bin
-# testbin/*
-# Dockerfile.cross
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin
+testbin/*
+Dockerfile.cross
 
 # Test binary, build with `go test -c`
 *.test

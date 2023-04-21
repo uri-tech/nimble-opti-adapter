@@ -1,3 +1,5 @@
+// groupversion_info.go
+
 /*
 Copyright 2023.
 
