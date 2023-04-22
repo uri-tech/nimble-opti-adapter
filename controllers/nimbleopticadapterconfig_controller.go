@@ -39,6 +39,8 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/uri-tech/NimbleOpticAdapter/api/v1alpha1"
+
+	// configv1alpha1 "github.com/uri-tech/NimbleOpticAdapter/api/v1alpha1"
 	corev1informers "k8s.io/client-go/informers/core/v1"
 )
 
@@ -76,7 +78,7 @@ type NimbleOpticAdapterConfigReconciler struct {
 // Modify the SetupWithManager function to include watches on Ingress and Secret resources
 func (r *NimbleOpticAdapterConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&configv1alpha1.NimbleOpticAdapterConfig{}).
+		For(&v1alpha1.NimbleOpticAdapterConfig{}).
 		// Watch Ingress resources and enqueue reconcile requests
 		Watches(&source.Kind{Type: &networkingv1.Ingress{}}, &handler.EnqueueRequestForObject{}).
 		// Watch Secret resources and enqueue reconcile requests
