@@ -45,6 +45,9 @@ type NimbleOpticAdapterConfigSpec struct {
 type NimbleOpticAdapterConfigStatus struct {
 	// Conditions are the conditions for this resource.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// IngressPathsForRenewal is a list of ingress paths for which certificates need to be renewed.
+	IngressPathsForRenewal []string `json:"ingressPathsForRenewal,omitempty"`
 }
 
 //+kubebuilder:object:root=true
