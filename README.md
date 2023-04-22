@@ -66,7 +66,7 @@ Edit the `values.yaml` file in the `helm/nimbleopticadapterconfig` directory to 
 
 - `labelSelector`: The label selector for namespaces the operator will manage certificates in (default: `nimble.optic.adapter/enabled: 'true'`)
 - `certificateRenewalThreshold`: The waiting time (in days) before the certificate expires to trigger renewal
-- `annotationRemovalDelay`: The delay (in seconds) after removing the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation before re-adding it
+- `annotationRemovalDelay`: The delay (in seconds) after removing the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation before re-adding it
 
 ## Usage
 
