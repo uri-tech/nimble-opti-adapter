@@ -4,7 +4,7 @@
   <img src="https://example.com/icon.png" alt="NimbleOpticAdapter Icon" width="80" height="80">
 </p> -->
 
-NimbleOpticAdapter is a Kubernetes operator that automates certificate renewal management when using ingress with the annotation `cert-manager.io/cluster-issuer` for services that require TLS communication. This operator is designed to work seamlessly with the NGINX ingress controller, efficiently handling the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation.
+NimbleOpticAdapter is a Kubernetes operator that automates certificate renewal management when using ingress with the annotation `cert-manager.io/cluster-issuer` for services that require TLS communication. This operator is designed to work seamlessly with the NGINX ingress controller, efficiently handling the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation.
 
 <!-- ![NimbleOpticAdapter Diagram](diagram.png) -->
 
