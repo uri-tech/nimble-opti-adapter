@@ -6,16 +6,15 @@ on:
     branches:
       - "main"
     # pull_request:
-    #   branches: [ "master" ]
-    paths:
-      - "controllers/**"
-      - "Dockerfile"
-      - "main.go"
-
-    # paths-ignore:
-    # - "NimbleOptiAdapter/README.md"
-    # - "NimbleOptiAdapter/code_blocks.png"
-
+    #   branches: [ "main" ]
+    # paths:
+    #   # - "controllers/**"
+    #   # - "Dockerfile"
+    #   # - "main.go"
+    #   - "*"
+    #   # Exclude README.md from triggering the workflow
+      paths-ignore:
+        - "README.md"
 jobs:
   build:
     runs-on: ubuntu-latest

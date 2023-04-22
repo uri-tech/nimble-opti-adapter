@@ -75,6 +75,7 @@ type NimbleOpticAdapterConfigReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 
+
 // Modify the SetupWithManager function to include watches on Ingress and Secret resources
 func (r *NimbleOpticAdapterConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -85,6 +86,7 @@ func (r *NimbleOpticAdapterConfigReconciler) SetupWithManager(mgr ctrl.Manager) 
 		Watches(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }
+
 
 // Modify your Reconcile function to handle events for Ingress and Secret resources
 func (r *NimbleOpticAdapterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -103,6 +105,7 @@ func (r *NimbleOpticAdapterConfigReconciler) Reconcile(ctx context.Context, req 
 
 	// Watch for Ingress events
 	ingress := &networkingv1.Ingress{}
+	
 	err = r.Client.Get(ctx, req.NamespacedName, ingress)
 	if err == nil {
 		return r.handleIngressEvent(ctx, req, nimbleOpticAdapterConfig)
@@ -183,7 +186,8 @@ func (r *NimbleOpticAdapterConfigReconciler) watchCertificateExpiration(ctx cont
 }
 
 // checkCertificateExpiration checks if the certificate in the specified Secret has expired, and renews the certificates if necessary.
-// It temporarily makes the services unavailable during the renewal process, updates the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation to make the services available again, and sets the status and conditions of the NimbleOpticAdapterConfig custom resource.
+// It temporarily makes the services unavailable during the renewal process, updates the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation to make the services available again, 
+// and sets the status and conditions of the NimbleOpticAdapterConfig custom resource.
 //
 // Parameters:
 //
@@ -262,6 +266,7 @@ func (r *NimbleOpticAdapterConfigReconciler) removeIngressAnnotationsAndWait(ctx
 	}
 
 	// Wait for the certificate renewal or until the AnnotationRemovalDelay expires
+	// TODO: Replace this with a more robust method of waiting for the certificate renewal
 	delay := time.Duration(config.Spec.AnnotationRemovalDelay) * time.Second
 	time.Sleep(delay)
 
