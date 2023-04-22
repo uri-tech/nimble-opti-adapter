@@ -19,28 +19,45 @@ limitations under the License.
 package controllers
 
 import (
-	"crypto/x509"
-	"fmt"
-	"time"
-
 	"context"
+	"crypto/x509"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/client-go/tools/cache"
 
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	configv1alpha1 "github.com/uri-tech/NimbleOpticAdapter/api/v1alpha1"
+	"github.com/go-logr/logr"
+	"github.com/uri-tech/NimbleOpticAdapter/api/v1alpha1"
+	corev1informers "k8s.io/client-go/informers/core/v1"
 )
 
 // NimbleOpticAdapterConfigReconciler reconciles a NimbleOpticAdapterConfig object
 type NimbleOpticAdapterConfigReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Log            logr.Logger
+	Scheme         *runtime.Scheme
+	SecretInformer corev1informers.SecretInformer
 }
+
+// type NimbleOpticAdapterConfigReconciler struct {
+// 	client.Client
+// 	Log               logr.Logger
+// 	Scheme            *runtime.Scheme
+// 	SecretInformer    cache.SharedIndexInformer
+// 	IngressInformer   cache.SharedIndexInformer
+// 	ConfigMapInformer cache.SharedIndexInformer
+// }
 
 //+kubebuilder:rbac:groups=config.nimbleopticadapter.tech-ua.com,resources=nimbleopticadapterconfigs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=config.nimbleopticadapter.tech-ua.com,resources=nimbleopticadapterconfigs/status,verbs=get;update;patch
@@ -55,223 +72,310 @@ type NimbleOpticAdapterConfigReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
-func (r *NimbleOpticAdapterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
 
-	// Step 1: Get the NimbleOpticAdapterConfig custom resource
-	config := &configv1alpha1.NimbleOpticAdapterConfig{}
-	if err := r.Get(ctx, req.NamespacedName, config); err != nil {
-		log.Error(err, "unable to fetch NimbleOpticAdapterConfig")
-		return ctrl.Result{}, client.IgnoreNotFound(err)
-	}
-
-	// Step 2: Retrieve the relevant certificates and their expiration dates
-	// move on all the ingress resources in the allowed namespace and that have the
-	// annotations "cert-manager.io/cluster-issuer" and "nginx.ingress.kubernetes.io/backend-protocol: HTTPS",
-	// take the secret name from it spec.tls.secretName, and return map object which contained the ingress path as
-	// the key and a list which containd  "spec.tls.secretName" value, and it certificate expiration date. as the value.
-	certificatesInfo, err := r.retrieveCertificates(ctx, config)
-	if err != nil {
-		log.Error(err, "unable to fetch certificates and their information")
-		return ctrl.Result{}, err
-	}
-
-	// Step 3: Determine if any certificate needs renewal
-	// Move on all the certificate expiration date from "Step 2", compare the expiration dates with
-	// the CertificateRenewalThreshold from the config and return the ingress path that connected to the
-	// secret which it certificates needed to be renewed.
-	ingressPathsForRenewal := r.findIngressPathsForRenewal(certificatesInfo, config)
-
-	// Step 4: Renew the certificates if necessary - Temporarily make the services unavailable
-	// remove the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation from the relevant Ingress resources and wait up to AnnotationRemovalDelay from the config or until the certificate is renewed (The first of them that takes place).
-	err = r.removeIngressAnnotationsAndWait(ctx, ingressPathsForRenewal, config)
-	if err != nil {
-		log.Error(err, "failed to remove annotations and wait for certificate renewal")
-		return ctrl.Result{}, err
-	}
-
-	// Step 5: Update the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation - make the services available again.
-	err = r.restoreIngressAnnotations(ctx, ingressPathsForRenewal, config)
-	if err != nil {
-		log.Error(err, "failed to restore annotations")
-		return ctrl.Result{}, err
-	}
-
-	// Step 6: Set the status and conditions of the NimbleOpticAdapterConfig custom resource
-	// Update the status of the custom resource to reflect the current state
-	err = r.updateCustomResourceStatus(ctx, config, ingressPathsForRenewal)
-	if err != nil {
-		log.Error(err, "failed to update custom resource status")
-		return ctrl.Result{}, err
-	}
-
-	// Finally, return the ctrl.Result{} and any error if applicable
-	return ctrl.Result{}, nil
-}
-
-// SetupWithManager sets up the controller with the Manager.
+// Modify the SetupWithManager function to include watches on Ingress and Secret resources
 func (r *NimbleOpticAdapterConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&configv1alpha1.NimbleOpticAdapterConfig{}).
+		// Watch Ingress resources and enqueue reconcile requests
+		Watches(&source.Kind{Type: &networkingv1.Ingress{}}, &handler.EnqueueRequestForObject{}).
+		// Watch Secret resources and enqueue reconcile requests
+		Watches(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }
 
-// move on all the ingress resources in the allowed namespace and that have the
-// annotations "cert-manager.io/cluster-issuer" and "nginx.ingress.kubernetes.io/backend-protocol: HTTPS",
-// take the secret name from it spec.tls.secretName, and return map object which contained the
-// ingress path as the key and a list which containd  "spec.tls.secretName" value, and it certificate expiration date.
-// as the value.
-func (r *NimbleOpticAdapterConfigReconciler) retrieveCertificates(ctx context.Context, config *configv1alpha1.NimbleOpticAdapterConfig) (map[string][]interface{}, error) {
-	ingressList := &networkingv1.IngressList{}
-	err := r.List(ctx, ingressList, &client.ListOptions{Namespace: config.Namespace})
+// Modify your Reconcile function to handle events for Ingress and Secret resources
+func (r *NimbleOpticAdapterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	// Fetch the NimbleOpticAdapterConfig instance
+	nimbleOpticAdapterConfig := &v1alpha1.NimbleOpticAdapterConfig{}
+	err := r.Client.Get(ctx, req.NamespacedName, nimbleOpticAdapterConfig)
 	if err != nil {
-		return nil, err
+		if errors.IsNotFound(err) {
+			// Request object not found, could have been deleted after reconcile request.
+			// Owned objects are automatically garbage collected. For additional cleanup logic use finalizers.
+			return ctrl.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		return ctrl.Result{}, err
 	}
 
-	certificatesInfo := make(map[string][]interface{})
+	// Watch for Ingress events
+	ingress := &networkingv1.Ingress{}
+	err = r.Client.Get(ctx, req.NamespacedName, ingress)
+	if err == nil {
+		return r.handleIngressEvent(ctx, req, nimbleOpticAdapterConfig)
+	}
+	return ctrl.Result{}, nil
+}
 
-	for _, ingress := range ingressList.Items {
-		// Check if the ingress resource has the required annotations
-		annotations := ingress.GetAnnotations()
-		if annotations["cert-manager.io/cluster-issuer"] != "" && annotations["nginx.ingress.kubernetes.io/backend-protocol"] == "HTTPS" {
-			// Iterate through the ingress TLS configuration
-			for _, tls := range ingress.Spec.TLS {
-				secretName := tls.SecretName
-				secret := &corev1.Secret{}
-				err := r.Get(ctx, client.ObjectKey{Name: secretName, Namespace: ingress.Namespace}, secret)
-				if err != nil {
-					return nil, err
-				}
+// handleIngressEvent is the event handler for the Ingress object. It fetches the Ingress object, checks if the Namespace
+// has the required label, and checks if the Ingress has the required annotations. If the required label and annotations
+// are present, it starts watching for the certificate expiration of each TLS in the Ingress.
+// This function returns a ctrl.Result and an error.
+func (r *NimbleOpticAdapterConfigReconciler) handleIngressEvent(ctx context.Context, req ctrl.Request, nimbleOpticAdapterConfig *v1alpha1.NimbleOpticAdapterConfig) (ctrl.Result, error) {
+	// Fetch the Ingress instance
+	ingress := &networkingv1.Ingress{}
+	err := r.Client.Get(ctx, req.NamespacedName, ingress)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
-				// Extract the expiration date from the secret
-				certBytes := secret.Data["tls.crt"]
-				cert, err := x509.ParseCertificate(certBytes)
-				if err != nil {
-					return nil, err
-				}
-				expirationDate := cert.NotAfter
+	// Check if the Namespace has the required label
+	namespace := &corev1.Namespace{}
+	err = r.Client.Get(ctx, types.NamespacedName{Name: ingress.Namespace}, namespace)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
 
-				// Iterate through the ingress rules and add their path to the map with the secret name and expiration date
-				for _, rule := range ingress.Spec.Rules {
-					for _, path := range rule.HTTP.Paths {
-						certificatesInfo[path.Path] = []interface{}{secretName, expirationDate}
-					}
-				}
+	enabled, ok := namespace.Labels["nimble.optic.adapter/enabled"]
+	if !ok || enabled != "true" {
+		return ctrl.Result{}, nil
+	}
+
+	// Check if Ingress has the required annotations
+	hasClusterIssuerAnnotation := false
+	hasBackendProtocolAnnotation := false
+
+	for key, value := range ingress.Annotations {
+		if key == "cert-manager.io/cluster-issuer" {
+			hasClusterIssuerAnnotation = true
+		}
+		if key == "nginx.ingress.kubernetes.io/backend-protocol" && value == "HTTPS" {
+			hasBackendProtocolAnnotation = true
+		}
+		if hasClusterIssuerAnnotation && hasBackendProtocolAnnotation {
+			break
+		}
+	}
+
+	if !hasClusterIssuerAnnotation || !hasBackendProtocolAnnotation {
+		return ctrl.Result{}, nil
+	}
+
+	// Iterate through Ingress TLS and start watching for the Secrets
+	for _, tls := range ingress.Spec.TLS {
+		secretName := tls.SecretName
+
+		// Start a goroutine to watch for the certificate expiration of each Secret
+		go r.watchCertificateExpiration(ctx, ingress.Namespace, secretName, nimbleOpticAdapterConfig.Spec.CertificateRenewalThreshold, nimbleOpticAdapterConfig)
+	}
+
+	return ctrl.Result{}, nil
+}
+
+// watchCertificateExpiration watches for certificate expiration in the specified Secret
+func (r *NimbleOpticAdapterConfigReconciler) watchCertificateExpiration(ctx context.Context, namespace, secretName string, renewalThreshold int, config *v1alpha1.NimbleOpticAdapterConfig) {
+	// Create an informer for the Secret
+	secretInformer := r.SecretInformer.Informer()
+	secretInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: func(oldObj, newObj interface{}) {
+			newSecret := newObj.(*corev1.Secret)
+			if newSecret.Namespace == namespace && newSecret.Name == secretName {
+				r.checkCertificateExpiration(ctx, newSecret, config)
 			}
-		}
-	}
-	return certificatesInfo, nil
+		},
+	})
+
+	// Start the informer
+	secretInformer.Run(ctx.Done())
 }
 
-// Move on all the certificate expiration date from "Step 2", compare the expiration dates with the
-// CertificateRenewalThreshold from the config and return the ingress path that connected to the secret
-// which it certificates needed to be renewed.
-func (r *NimbleOpticAdapterConfigReconciler) findIngressPathsForRenewal(certificatesInfo map[string][]interface{}, config *configv1alpha1.NimbleOpticAdapterConfig) []string {
-	ingressPathsForRenewal := []string{}
-
-	for ingressPath, certInfo := range certificatesInfo {
-		expirationDate := certInfo[1].(time.Time)
-		renewalThreshold := time.Duration(config.Spec.CertificateRenewalThreshold) * time.Hour
-		thresholdTime := time.Now().Add(renewalThreshold)
-
-		// If the certificate expires within the renewal threshold, add the ingress path to the list for renewal
-		if expirationDate.Before(thresholdTime) {
-			ingressPathsForRenewal = append(ingressPathsForRenewal, ingressPath)
-		}
+// checkCertificateExpiration checks if the certificate in the specified Secret has expired, and renews the certificates if necessary.
+// It temporarily makes the services unavailable during the renewal process, updates the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation to make the services available again, and sets the status and conditions of the NimbleOpticAdapterConfig custom resource.
+//
+// Parameters:
+//
+//	ctx: The context of the request.
+//	secret: The Secret containing the certificate to check.
+//	config: The NimbleOpticAdapterConfig custom resource containing the configurations.
+func (r *NimbleOpticAdapterConfigReconciler) checkCertificateExpiration(ctx context.Context, secret *corev1.Secret, config *v1alpha1.NimbleOpticAdapterConfig) {
+	// Extract the certificate bytes from the Secret
+	certBytes, ok := secret.Data["tls.crt"]
+	if !ok {
+		return
 	}
 
-	return ingressPathsForRenewal
-}
+	// Parse the certificate
+	cert, err := x509.ParseCertificate(certBytes)
+	if err != nil {
+		return
+	}
 
-// remove the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation from the relevant Ingress resources
-// and wait up to AnnotationRemovalDelay from the config or until the certificate is renewed (The first of them that takes place)
-func (r *NimbleOpticAdapterConfigReconciler) removeIngressAnnotationsAndWait(ctx context.Context, ingressPathsForRenewal []string, config *configv1alpha1.NimbleOpticAdapterConfig) error {
-	annotationKey := "nginx.ingress.kubernetes.io/backend-protocol"
-	annotationValue := "HTTPS"
+	// Calculate the time remaining until the certificate expires
+	timeRemaining := time.Until(cert.NotAfter)
 
-	for _, ingressPath := range ingressPathsForRenewal {
-		// Find the Ingress resource by the ingress path
-		ingress := &networkingv1.Ingress{}
-		err := r.Get(ctx, client.ObjectKey{Name: ingressPath, Namespace: config.Namespace}, ingress)
+	// Check if the remaining time is less than the threshold
+	thresholdDuration := time.Duration(config.Spec.CertificateRenewalThreshold) * 24 * time.Hour
+	if timeRemaining < thresholdDuration {
+		// Renew the certificates if necessary - Temporarily make the services unavailable
+		ingressPathsForRenewal := []string{} // Use the appropriate ingress paths for renewal
+		err = r.removeIngressAnnotationsAndWait(ctx, ingressPathsForRenewal, config)
 		if err != nil {
-			return fmt.Errorf("failed to get Ingress resource: %w", err)
+			// Log the error and return if failed to remove annotations and wait for certificate renewal
+			log.Log.Error(err, "failed to remove annotations and wait for certificate renewal")
+			return
 		}
 
-		// Remove the annotation if it exists
-		if ingress.Annotations[annotationKey] == annotationValue {
-			delete(ingress.Annotations, annotationKey)
-
-			// Update the Ingress resource
-			err = r.Update(ctx, ingress)
-			if err != nil {
-				return fmt.Errorf("failed to update Ingress resource: %w", err)
-			}
+		// Update the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation - make the services available again.
+		err = r.restoreIngressAnnotations(ctx, ingressPathsForRenewal, config)
+		if err != nil {
+			// Log the error and return if failed to restore annotations
+			log.Log.Error(err, "failed to restore annotations")
+			return
 		}
 
-		// Wait for the certificate to be renewed or the AnnotationRemovalDelay to be reached
-		renewalTimeout := time.After(time.Duration(config.Spec.AnnotationRemovalDelay) * time.Second)
-		ticker := time.NewTicker(10 * time.Second)
+		// Set the status and conditions of the NimbleOpticAdapterConfig custom resource
+		// Update the status of the custom resource to reflect the current state
+		err = r.updateCustomResourceStatus(ctx, config, ingressPathsForRenewal)
+		if err != nil {
+			// Log the error and return if failed to update custom resource status
+			log.Log.Error(err, "failed to update custom resource status")
+			return
+		}
+	}
+}
 
-		defer ticker.Stop()
+// removeIngressAnnotationsAndWait removes the required annotations from the Ingress resources and waits for the certificate renewal
+// before making the services available again. This function accepts a slice of Ingress paths to be updated and the NimbleOpticAdapterConfig custom resource.
+// It iterates through the Ingress resources, removes the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation, and updates the Ingress resources.
+// After updating the Ingress resources, it waits for the certificate renewal or until the AnnotationRemovalDelay expires.
+func (r *NimbleOpticAdapterConfigReconciler) removeIngressAnnotationsAndWait(ctx context.Context, ingressPathsForRenewal []string, config *v1alpha1.NimbleOpticAdapterConfig) error {
+	// Iterate through the Ingress resources that need to be updated
+	for _, ingressPath := range ingressPathsForRenewal {
+		// Get the Ingress resource
+		ingress := &networkingv1.Ingress{}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: ingressPath, Namespace: config.Spec.TargetNamespace}, ingress)
+		if err != nil {
+			return err
+		}
 
-		for {
-			select {
-			case <-renewalTimeout:
-				return nil
-			case <-ticker.C:
-				// Check if the certificate has been renewed
-				// Implement your logic to check if the certificate is renewed
-				certificateRenewed := false
-				if certificateRenewed {
-					return nil
-				}
-			}
+		// Remove the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation
+		delete(ingress.Annotations, "nginx.ingress.kubernetes.io/backend-protocol")
+
+		// Update the Ingress resource
+		err = r.Client.Update(ctx, ingress)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Wait for the certificate renewal or until the AnnotationRemovalDelay expires
+	delay := time.Duration(config.Spec.AnnotationRemovalDelay) * time.Second
+	time.Sleep(delay)
+
+	return nil
+}
+
+func (r *NimbleOpticAdapterConfigReconciler) restoreIngressAnnotations(ctx context.Context, ingressPathsForRenewal []string, config *v1alpha1.NimbleOpticAdapterConfig) error {
+	// Iterate through the Ingress resources that need to be updated
+	for _, ingressPath := range ingressPathsForRenewal {
+		// Get the Ingress resource
+		ingress := &networkingv1.Ingress{}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: ingressPath, Namespace: config.Spec.TargetNamespace}, ingress)
+		if err != nil {
+			return err
+		}
+
+		// Restore the annotation
+		if ingress.Annotations == nil {
+			ingress.Annotations = make(map[string]string)
+		}
+		ingress.Annotations["nginx.ingress.kubernetes.io/backend-protocol"] = "HTTPS"
+
+		// Update the Ingress resource
+		err = r.Client.Update(ctx, ingress)
+		if err != nil {
+			return err
 		}
 	}
 
 	return nil
 }
 
-// Update the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation - make the services available again.
-func (r *NimbleOpticAdapterConfigReconciler) restoreIngressAnnotations(ctx context.Context, ingressPathsForRenewal []string, config *configv1alpha1.NimbleOpticAdapterConfig) error {
-	annotationKey := "nginx.ingress.kubernetes.io/backend-protocol"
-	annotationValue := "HTTPS"
-
-	for _, ingressPath := range ingressPathsForRenewal {
-		// Find the Ingress resource by the ingress path
-		ingress := &networkingv1.Ingress{}
-		err := r.Get(ctx, client.ObjectKey{Name: ingressPath, Namespace: config.Namespace}, ingress)
-		if err != nil {
-			return fmt.Errorf("failed to get Ingress resource: %w", err)
-		}
-
-		// Update the annotation if it does not exist
-		if ingress.Annotations[annotationKey] != annotationValue {
-			if ingress.Annotations == nil {
-				ingress.Annotations = make(map[string]string)
-			}
-			ingress.Annotations[annotationKey] = annotationValue
-
-			// Update the Ingress resource
-			err = r.Update(ctx, ingress)
-			if err != nil {
-				return fmt.Errorf("failed to update Ingress resource: %w", err)
-			}
-		}
-	}
-
-	return nil
-}
-
-func (r *NimbleOpticAdapterConfigReconciler) updateCustomResourceStatus(ctx context.Context, config *configv1alpha1.NimbleOpticAdapterConfig, ingressPathsForRenewal []string) error {
-	// Set the status and conditions of the NimbleOpticAdapterConfig custom resource
+// updateCustomResourceStatus updates the status of the NimbleOpticAdapterConfig custom resource
+// with the list of ingress paths that need certificate renewal and a condition representing the
+// successful renewal of certificates.
+func (r *NimbleOpticAdapterConfigReconciler) updateCustomResourceStatus(ctx context.Context, config *v1alpha1.NimbleOpticAdapterConfig, ingressPathsForRenewal []string) error {
+	// Set the IngressPathsForRenewal field
 	config.Status.IngressPathsForRenewal = ingressPathsForRenewal
 
-	// Update the status of the custom resource to reflect the current state
+	// Set the conditions for the custom resource
+	// You can customize the conditions based on your requirements
+	condition := metav1.Condition{
+		Type:               "Ready",
+		Status:             metav1.ConditionTrue,
+		Reason:             "CertificateRenewed",
+		Message:            "Certificate renewed successfully",
+		LastTransitionTime: metav1.Now(),
+	}
+	config.Status.Conditions = []metav1.Condition{condition}
+
+	// Update the status of the custom resource
 	err := r.Status().Update(ctx, config)
 	if err != nil {
-		return fmt.Errorf("failed to update NimbleOpticAdapterConfig status: %w", err)
+		return err
 	}
 
 	return nil
 }
+
+// func (r *NimbleOpticAdapterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+// 	log := log.FromContext(ctx)
+
+// 	// Step 1: Get the NimbleOpticAdapterConfig custom resource
+// 	config := &configv1alpha1.NimbleOpticAdapterConfig{}
+// 	if err := r.Get(ctx, req.NamespacedName, config); err != nil {
+// 		log.Error(err, "unable to fetch NimbleOpticAdapterConfig")
+// 		return ctrl.Result{}, client.IgnoreNotFound(err)
+// 	}
+
+// 	// Step 2: Retrieve the relevant certificates and their expiration dates
+// 	// move on all the ingress resources in the allowed namespace and that have the
+// 	// annotations "cert-manager.io/cluster-issuer" and "nginx.ingress.kubernetes.io/backend-protocol: HTTPS",
+// 	// take the secret name from it spec.tls.secretName, and return map object which contained the ingress path as
+// 	// the key and a list which containd  "spec.tls.secretName" value, and it certificate expiration date. as the value.
+// 	certificatesInfo, err := r.retrieveCertificates(ctx, config)
+// 	if err != nil {
+// 		log.Error(err, "unable to fetch certificates and their information")
+// 		return ctrl.Result{}, err
+// 	}
+
+// 	// Step 3: Determine if any certificate needs renewal
+// 	// Move on all the certificate expiration date from "Step 2", compare the expiration dates with
+// 	// the CertificateRenewalThreshold from the config and return the ingress path that connected to the
+// 	// secret which it certificates needed to be renewed.
+// 	ingressPathsForRenewal := r.findIngressPathsForRenewal(certificatesInfo, config)
+
+// 	// Step 4: Renew the certificates if necessary - Temporarily make the services unavailable
+// 	// remove the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation from the relevant Ingress resources and wait up to AnnotationRemovalDelay from the config or until the certificate is renewed (The first of them that takes place).
+// 	err = r.removeIngressAnnotationsAndWait(ctx, ingressPathsForRenewal, config)
+// 	if err != nil {
+// 		log.Error(err, "failed to remove annotations and wait for certificate renewal")
+// 		return ctrl.Result{}, err
+// 	}
+
+// 	// Step 5: Update the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation - make the services available again.
+// 	err = r.restoreIngressAnnotations(ctx, ingressPathsForRenewal, config)
+// 	if err != nil {
+// 		log.Error(err, "failed to restore annotations")
+// 		return ctrl.Result{}, err
+// 	}
+
+// 	// Step 6: Set the status and conditions of the NimbleOpticAdapterConfig custom resource
+// 	// Update the status of the custom resource to reflect the current state
+// 	err = r.updateCustomResourceStatus(ctx, config, ingressPathsForRenewal)
+// 	if err != nil {
+// 		log.Error(err, "failed to update custom resource status")
+// 		return ctrl.Result{}, err
+// 	}
+
+// 	// Finally, return the ctrl.Result{} and any error if applicable
+// 	return ctrl.Result{}, nil
+// }
+
+// // SetupWithManager sets up the controller with the Manager.
+// func (r *NimbleOpticAdapterConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+// 	return ctrl.NewControllerManagedBy(mgr).
+// 		For(&configv1alpha1.NimbleOpticAdapterConfig{}).
+// 		Complete(r)
+// }
