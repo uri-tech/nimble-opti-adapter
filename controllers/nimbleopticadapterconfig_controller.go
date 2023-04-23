@@ -20,6 +20,7 @@ package controllers
 
 import (
 	"context"
+	"crypto/tls"
 	"crypto/x509"
 	"time"
 
@@ -75,7 +76,6 @@ type NimbleOpticAdapterConfigReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.1/pkg/reconcile
 
-
 // Modify the SetupWithManager function to include watches on Ingress and Secret resources
 func (r *NimbleOpticAdapterConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
@@ -86,7 +86,6 @@ func (r *NimbleOpticAdapterConfigReconciler) SetupWithManager(mgr ctrl.Manager) 
 		Watches(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }
-
 
 // Modify your Reconcile function to handle events for Ingress and Secret resources
 func (r *NimbleOpticAdapterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -105,7 +104,7 @@ func (r *NimbleOpticAdapterConfigReconciler) Reconcile(ctx context.Context, req 
 
 	// Watch for Ingress events
 	ingress := &networkingv1.Ingress{}
-	
+
 	err = r.Client.Get(ctx, req.NamespacedName, ingress)
 	if err == nil {
 		return r.handleIngressEvent(ctx, req, nimbleOpticAdapterConfig)
@@ -176,7 +175,7 @@ func (r *NimbleOpticAdapterConfigReconciler) watchCertificateExpiration(ctx cont
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			newSecret := newObj.(*corev1.Secret)
 			if newSecret.Namespace == namespace && newSecret.Name == secretName {
-				r.checkCertificateExpiration(ctx, newSecret, config)
+				r.checkCertificateExpiration(ctx, newSecret, config, namespace, secretName)
 			}
 		},
 	})
@@ -186,7 +185,7 @@ func (r *NimbleOpticAdapterConfigReconciler) watchCertificateExpiration(ctx cont
 }
 
 // checkCertificateExpiration checks if the certificate in the specified Secret has expired, and renews the certificates if necessary.
-// It temporarily makes the services unavailable during the renewal process, updates the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation to make the services available again, 
+// It temporarily makes the services unavailable during the renewal process, updates the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation to make the services available again,
 // and sets the status and conditions of the NimbleOpticAdapterConfig custom resource.
 //
 // Parameters:
@@ -194,7 +193,7 @@ func (r *NimbleOpticAdapterConfigReconciler) watchCertificateExpiration(ctx cont
 //	ctx: The context of the request.
 //	secret: The Secret containing the certificate to check.
 //	config: The NimbleOpticAdapterConfig custom resource containing the configurations.
-func (r *NimbleOpticAdapterConfigReconciler) checkCertificateExpiration(ctx context.Context, secret *corev1.Secret, config *v1alpha1.NimbleOpticAdapterConfig) {
+func (r *NimbleOpticAdapterConfigReconciler) checkCertificateExpiration(ctx context.Context, secret *corev1.Secret, config *v1alpha1.NimbleOpticAdapterConfig, namespace string, secretName string) {
 	// Extract the certificate bytes from the Secret
 	certBytes, ok := secret.Data["tls.crt"]
 	if !ok {
@@ -215,7 +214,7 @@ func (r *NimbleOpticAdapterConfigReconciler) checkCertificateExpiration(ctx cont
 	if timeRemaining < thresholdDuration {
 		// Renew the certificates if necessary - Temporarily make the services unavailable
 		ingressPathsForRenewal := []string{} // Use the appropriate ingress paths for renewal
-		err = r.removeIngressAnnotationsAndWait(ctx, ingressPathsForRenewal, config)
+		err = r.removeIngressAnnotationsAndWait(ctx, ingressPathsForRenewal, config, namespace, secretName)
 		if err != nil {
 			// Log the error and return if failed to remove annotations and wait for certificate renewal
 			log.Log.Error(err, "failed to remove annotations and wait for certificate renewal")
@@ -245,9 +244,16 @@ func (r *NimbleOpticAdapterConfigReconciler) checkCertificateExpiration(ctx cont
 // before making the services available again. This function accepts a slice of Ingress paths to be updated and the NimbleOpticAdapterConfig custom resource.
 // It iterates through the Ingress resources, removes the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation, and updates the Ingress resources.
 // After updating the Ingress resources, it waits for the certificate renewal or until the AnnotationRemovalDelay expires.
-func (r *NimbleOpticAdapterConfigReconciler) removeIngressAnnotationsAndWait(ctx context.Context, ingressPathsForRenewal []string, config *v1alpha1.NimbleOpticAdapterConfig) error {
+func (r *NimbleOpticAdapterConfigReconciler) removeIngressAnnotationsAndWait(
+	ctx context.Context,
+	ingressPathsForRenewal []string,
+	config *v1alpha1.NimbleOpticAdapterConfig,
+	namespace string,
+	secretName string,
+) error {
 	// Iterate through the Ingress resources that need to be updated
 	for _, ingressPath := range ingressPathsForRenewal {
+
 		// Get the Ingress resource
 		ingress := &networkingv1.Ingress{}
 		err := r.Client.Get(ctx, types.NamespacedName{Name: ingressPath, Namespace: config.Spec.TargetNamespace}, ingress)
@@ -266,9 +272,36 @@ func (r *NimbleOpticAdapterConfigReconciler) removeIngressAnnotationsAndWait(ctx
 	}
 
 	// Wait for the certificate renewal or until the AnnotationRemovalDelay expires
-	// TODO: Replace this with a more robust method of waiting for the certificate renewal
-	delay := time.Duration(config.Spec.AnnotationRemovalDelay) * time.Second
-	time.Sleep(delay)
+	// Get the current time
+	currentTime := time.Now()
+
+	// Calculate the expiration threshold based on the CertificateRenewalThreshold
+	expirationThreshold := currentTime.Add(time.Hour * 24 * time.Duration(config.Spec.CertificateRenewalThreshold))
+
+	// Calculate the end time based on the AnnotationRemovalDelay
+	endTime := currentTime.Add(time.Minute * time.Duration(config.Spec.AnnotationRemovalDelay))
+
+	for {
+		// Check if the current time is after the end time
+		if currentTime.After(endTime) {
+			log.Log.Info("Annotation removal delay has passed, returning")
+			break
+		}
+
+		// Check if there is a new certificate secret with the same name and
+		// namespace that has more than CertificateRenewalThreshold time left until it expires
+		durationUntilExpiration := time.Until(expirationThreshold)
+		flagNotExpiring, err := isSecretNotExpiring(r.Client, namespace, secretName, durationUntilExpiration)
+		if err != nil {
+			return err
+		}
+		if flagNotExpiring {
+			log.Log.Info("New certificate has been found and it is new, returning")
+			break
+		}
+
+		currentTime = time.Now()
+	}
 
 	return nil
 }
@@ -325,6 +358,50 @@ func (r *NimbleOpticAdapterConfigReconciler) updateCustomResourceStatus(ctx cont
 
 	return nil
 }
+
+// Define a function to check if the secret exists and if it is expiring soon
+func isSecretNotExpiring(coreClient client.Client, namespace, secretName string, threshold time.Duration) (bool, error) {
+	secret := &corev1.Secret{}
+	err := coreClient.Get(context.Background(), types.NamespacedName{Namespace: namespace, Name: secretName}, secret)
+	if err != nil {
+		log.Log.Error(err, "failed to get secret")
+		return false, err
+	}
+	cert, err := tls.X509KeyPair(secret.Data["tls.crt"], secret.Data["tls.key"])
+	if err != nil {
+		log.Log.Error(err, "failed to parse secret data")
+		return false, err
+	}
+	chain, err := x509.ParseCertificate(cert.Certificate[0])
+	if err != nil {
+		log.Log.Error(err, "failed to parse certificate")
+		return false, err
+	}
+	durationUntilExpiration := time.Until(chain.NotAfter)
+	daysLeft := int(durationUntilExpiration.Hours() / 24)
+	if daysLeft < int(threshold.Hours()/24) {
+		log.Log.Info("certificate is not expiring soon", "days left", daysLeft)
+		return false, nil
+	}
+	return true, nil
+}
+
+// Define a function to check if the annotation has been removed
+// func isAnnotationRemoved(coreClient client.Client, namespace, annotation string) bool {
+// 	ingresses := &networkingv1.IngressList{}
+// 	err := coreClient.List(context.Background(), ingresses, client.InNamespace(namespace))
+// 	if err != nil {
+// 		log.Log.Error(err, "failed to list ingresses")
+// 		return false
+// 	}
+// 	for _, ingress := range ingresses.Items {
+// 		if _, ok := ingress.Annotations[annotation]; ok {
+// 			log.Log.Info("annotation still present", "ingress", ingress.Name)
+// 			return false
+// 		}
+// 	}
+// 	return true
+// }
 
 // func (r *NimbleOpticAdapterConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 // 	log := log.FromContext(ctx)

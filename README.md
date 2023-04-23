@@ -28,8 +28,8 @@ NimbleOpticAdapter is a Kubernetes operator that automates certificate renewal m
 
 - Kubernetes cluster (v1.16+)
 - Helm (v3+)
-- Go (v1.13+)
-- Kubebuilder (v2+)
+<!-- - Go (v1.13+)
+- Kubebuilder (v2+) -->
 
 ## Quick Start
 
