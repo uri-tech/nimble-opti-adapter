@@ -4,34 +4,47 @@
   <img src="https://example.com/icon.png" alt="NimbleOpticAdapter Icon" width="80" height="80">
 </p> -->
 
+<p align="center">
+  <!-- <a href="https://github.com/uri-tech/NimbleOpticAdapter/actions">
+    <img alt="Build Status" src="https://github.com/uri-tech/NimbleOpticAdapter/workflows/build/badge.svg">
+  </a> -->
+  <a href="https://github.com/uri-tech/NimbleOpticAdapter/blob/master/LICENSE">
+    <img alt="License: Apache 2.0" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg">
+  </a>
+  <a href="https://github.com/uri-tech/NimbleOpticAdapter/releases">
+    <img alt="GitHub release" src="https://img.shields.io/github/v/release/uri-tech/NimbleOpticAdapter">
+  </a>
+  <a href="https://github.com/uri-tech/NimbleOpticAdapter/issues">
+    <img alt="GitHub issues" src="https://img.shields.io/github/issues/uri-tech/NimbleOpticAdapter">
+  </a>
+</p>
+
 NimbleOpticAdapter is a Kubernetes operator that automates certificate renewal management when using ingress with the annotation `cert-manager.io/cluster-issuer` for services that require TLS communication. This operator is designed to work seamlessly with the NGINX ingress controller, efficiently handling the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation.
 
 <!-- ![NimbleOpticAdapter Diagram](diagram.png) -->
 
-## Features
+## 🌟 Features
 
-- Automatic certificate renewal based on certificate validity and user-defined waiting times
-- Supports multi-namespace operation with a configurable label selector
-- Prometheus metrics collection for certificate renewals and annotation updates
-- Easy installation using Helm
-- Extensible architecture for future enhancements
+- 🔄 Automatic certificate renewal based on certificate validity and user-defined waiting times
+- 🏷️ Supports multi-namespace operation with a configurable label selector
+- 📊 Prometheus metrics collection for certificate renewals and annotation updates
+- 🚀 Easy installation using Helm
+- 🔌 Extensible architecture for future enhancements
 
-## Future Enhancements
+## ⏳ Future Enhancements
 
-- Customizable alerting and notification system for certificate renewals and errors
-- Integration with external certificate issuers or other certificate management systems
-- Enhanced Prometheus metrics for deeper insights into certificate management
-- Support for other ingress controllers besides NGINX
-- Automatic handling of additional ingress annotations as needed
+- 🔔 Customizable alerting and notification system for certificate renewals and errors
+- 🔗 Integration with external certificate issuers or other certificate management systems
+- 📈 Enhanced Prometheus metrics for deeper insights into certificate management
+- 🚦 Support for other ingress controllers besides NGINX
+- 📝 Automatic handling of additional ingress annotations as needed
 
-## Prerequisites
+## 📚 Prerequisites
 
 - Kubernetes cluster (v1.16+)
 - Helm (v3+)
-<!-- - Go (v1.13+)
-- Kubebuilder (v2+) -->
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Step 1: Clone the repository
 
@@ -60,7 +73,7 @@ helm package nimbleopticadapterconfig
 helm upgrade nimbleopticadapter ./nimbleopticadapterconfig-0.1.0.tgz
 ```
 
-## Configuration
+## ⚙️ Configuration
 
 Edit the `values.yaml` file in the `helm/nimbleopticadapterconfig` directory to customize the following parameters:
 
@@ -68,7 +81,7 @@ Edit the `values.yaml` file in the `helm/nimbleopticadapterconfig` directory to 
 - `certificateRenewalThreshold`: The waiting time (in days) before the certificate expires to trigger renewal
 - `annotationRemovalDelay`: The delay (in seconds) after removing the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation before re-adding it
 
-## Usage
+## 📝 Usage
 
 Label the namespaces where the operator should manage certificates:
 
@@ -93,24 +106,24 @@ spec:
   annotationRemovalDelay: 60
 ```
 
-## Metrics
+## 📊 Metrics
 
 NimbleOpticAdapter exposes the following Prometheus metrics:
 
 - `nimbleopticadapter_certificate_renewals_total`: Total number of certificate renewals
 - `nimbleopticadapter_annotation_updates_duration_seconds`: Duration (in seconds) of annotation updates during each renewal
 
-## Contributing
+## 🤝 Contributing
 
-We welcome contributions to the NimbleOpticAdapter project! Please see the CONTRIBUTING.md file for more information on how to contribute.
+We welcome contributions to the NimbleOpticAdapter project! Please see the [CONTRIBUTING.md](CONTRIBUTING.md) file for more information on how to contribute.
 
-## License
+## 📜 License
 
-NimbleOpticAdapter is licensed under the Apache License, Version 2.0.
+NimbleOpticAdapter is licensed under the [Apache License, Version 2.0](LICENSE).
 
-## Support
+## 📞 Support
 
-For any questions, bug reports, or feature requests, please open an issue on our [GitHub repository](https://github.com/uri-tech/NimbleOpticAdapter/issues)
+For any questions, bug reports, or feature requests, please open an issue on our [GitHub repository](https://github.com/uri-tech/NimbleOpticAdapter/issues).
 
 <!-- ## Attribution
 
