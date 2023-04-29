@@ -20,29 +20,14 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      # serviceAccountName: {{ include "nimble-opti-adapter.serviceAccountName" . }}
-      # securityContext:
-      #   {{- toYaml .Values.podSecurityContext | nindent 8 }}
       # containers:
       #   - name: {{ .Chart.Name }}
-      #     securityContext:
-      #       {{- toYaml .Values.securityContext | nindent 12 }}
       #     image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
       #     imagePullPolicy: {{ .Values.image.pullPolicy }}
       #     ports:
       #       - name: http
       #         containerPort: 80
       #         protocol: TCP
-      #     livenessProbe:
-      #       httpGet:
-      #         path: /healthz
-      #         port: http
-      #     readinessProbe:
-      #       httpGet:
-      #         path: /readyz
-      #         port: http
-      #     resources:
-      #       {{- toYaml .Values.resources | nindent 12 }}
       # {{- with .Values.nodeSelector }}
       # nodeSelector:
       #   {{- toYaml . | nindent 8 }}
