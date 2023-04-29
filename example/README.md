@@ -60,26 +60,26 @@ mkdir output
 Run the helm template command to render the templates and save them in the output directory:
 
 ```bash
-helm template nimbleopticadapter ./helm/nimble-optic-adapter --output-dir ./output
+helm template nimble-opti-adapter ./helm/nimble-opti-adapter --output-dir ./output
 ```
 
 Inspect the generated files in the output directory:
 
 ```bash
 tree -hapugD --dirsfirst --charset=utf-8 ./output
-nano ./output/nimble-optic-adapter/templates/deployment.yaml
+nano ./output/nimble-opti-adapter/templates/deployment.yaml
 ```
 
 Install the NimbleOpticAdapter operator using Helm:
 
 ```bash
-helm install nimbleopticadapter ./helm/nimble-optic-adapter
+helm install nimbleopticadapter ./helm/nimble-opti-adapter
 ```
 
 Inspect the container using kubectl:
 
 ```bash
-k -n default describe deployment nimble-optic-adapter-nimbleopticadapter
+k -n default describe deployment nimble-opti-adapter-nimbleopticadapter
 k -n default describe pod <pod_name>
 k -n default logs <pod_name> <container_name>
 ```
@@ -94,7 +94,7 @@ k label namespace default nimble.optic.adapter/enabled=true
 
 ## Step 5: Create a NimbleOpticAdapterConfig custom resource
 
-Create a `nimble-optic-adapter.yaml` file with the following content:
+Create a `nimble-opti-adapter.yaml` file with the following content:
 
 ```ymal
 apiVersion: nimbleopticadapter.example.com/v1alpha1
@@ -109,7 +109,7 @@ spec:
 Apply the configuration:
 
 ```bash
-k apply -f nimble-optic-adapter.yaml
+k apply -f nimble-opti-adapter.yaml
 ```
 
 ## Step 6: Test the operator
@@ -160,7 +160,7 @@ Once you've finished testing, you can delete the resources and stop Minikube:
 
 ```bash
 k delete -f example-ingress.yaml
-k delete -f nimble-optic-adapter.yaml
+k delete -f nimble-opti-adapter.yaml
 helm uninstall nimbleopticadapter
 minikube stop
 ```
