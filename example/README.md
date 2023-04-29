@@ -161,6 +161,6 @@ Once you've finished testing, you can delete the resources and stop Minikube:
 ```bash
 k delete -f example-ingress.yaml
 k delete -f nimble-opti-adapter.yaml
-helm uninstall nimble-opti-adapter
+helm uninstall nimble-opti-adapter --namespace nimble-opti-adapter
 minikube stop
 ```

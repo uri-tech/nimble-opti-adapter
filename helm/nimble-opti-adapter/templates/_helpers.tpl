@@ -38,6 +38,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- printf "%s-%s" (include "nimble-opti-adapter.name" .) .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- printf "%s" (include "nimble-opti-adapter.name" .) | trunc 63 | trimSuffix "-" }}
 {{- end }}
 {{- end -}}
