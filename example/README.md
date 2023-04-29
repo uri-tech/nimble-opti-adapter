@@ -79,9 +79,9 @@ helm install nimble-opti-adapter ./helm/nimble-opti-adapter --create-namespace -
 Inspect the container using kubectl:
 
 ```bash
-k -n default describe deployment nimble-opti-adapter-nimble-opti-adapter
-k -n default describe pod <pod_name>
-k -n default logs <pod_name> <container_name>
+k -n nimble-opti-adapter describe deployment nimble-opti-adapter
+k -n nimble-opti-adapter describe pod <pod_name>
+k -n nimble-opti-adapter logs <pod_name> <container_name>
 ```
 
 ## Step 4: Label the namespace
