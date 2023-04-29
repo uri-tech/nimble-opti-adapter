@@ -1,26 +1,26 @@
-# ./helm/nimbleopticadapterconfig/templates/deployment.yaml
+# ./helm/nimble-optic-adapter/templates/deployment.yaml
 
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "nimbleopticadapterconfig.fullname" . }}
+  name: {{ include "nimble-optic-adapter.fullname" . }}
   labels:
-    {{- include "nimbleopticadapterconfig.labels" . | nindent 4 }}
+    {{- include "nimble-optic-adapter.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "nimbleopticadapterconfig.selectorLabels" . | nindent 6 }}
+      {{- include "nimble-optic-adapter.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
-        {{- include "nimbleopticadapterconfig.selectorLabels" . | nindent 8 }}
+        {{- include "nimble-optic-adapter.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      # serviceAccountName: {{ include "nimbleopticadapterconfig.serviceAccountName" . }}
+      # serviceAccountName: {{ include "nimble-optic-adapter.serviceAccountName" . }}
       # securityContext:
       #   {{- toYaml .Values.podSecurityContext | nindent 8 }}
       # containers:

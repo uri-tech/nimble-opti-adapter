@@ -1,7 +1,7 @@
 {{/* Generate basic labels */}}
-{{- define "nimbleopticadapterconfig.labels" -}}
-helm.sh/chart: {{ include "nimbleopticadapterconfig.chart" . }}
-{{ include "nimbleopticadapterconfig.selectorLabels" . }}
+{{- define "nimble-optic-adapter.labels" -}}
+helm.sh/chart: {{ include "nimble-optic-adapter.chart" . }}
+{{ include "nimble-optic-adapter.selectorLabels" . }}
 {{- if .Chart.AppVersion }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
@@ -9,35 +9,35 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
 {{/* Selector labels */}}
-{{- define "nimbleopticadapterconfig.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "nimbleopticadapterconfig.name" . }}
+{{- define "nimble-optic-adapter.selectorLabels" -}}
+app.kubernetes.io/name: {{ include "nimble-optic-adapter.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
 {{/* Generate the name of the service account */}}
-{{- define "nimbleopticadapterconfig.serviceAccountName" -}}
+{{- define "nimble-optic-adapter.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
-{{- default (include "nimbleopticadapterconfig.fullname" .) .Values.serviceAccount.name }}
+{{- default (include "nimble-optic-adapter.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end -}}
 
 {{/* Generate the chart name */}}
-{{- define "nimbleopticadapterconfig.chart" -}}
+{{- define "nimble-optic-adapter.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end -}}
 
 {{/* Generate the name */}}
-{{- define "nimbleopticadapterconfig.name" -}}
+{{- define "nimble-optic-adapter.name" -}}
 {{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end -}}
 
 {{/* Generate the fullname */}}
-{{- define "nimbleopticadapterconfig.fullname" -}}
+{{- define "nimble-optic-adapter.fullname" -}}
 {{- if .Values.fullnameOverride }}
 {{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
 {{- else }}
-{{- printf "%s-%s" (include "nimbleopticadapterconfig.name" .) .Release.Name | trunc 63 | trimSuffix "-" }}
+{{- printf "%s-%s" (include "nimble-optic-adapter.name" .) .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- end }}
 {{- end -}}
