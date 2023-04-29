@@ -1,0 +1,1 @@
+A plain text file that is displayed to the user after the chart is installed. It often includes usage instructions or other important information.
