@@ -16,11 +16,42 @@ spec:
       labels:
         {{- include "nimbleopticadapterconfig.selectorLabels" . | nindent 8 }}
     spec:
-      containers:
-        - name: {{ .Chart.Name }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.pullPolicy }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      # serviceAccountName: {{ include "nimbleopticadapterconfig.serviceAccountName" . }}
+      # securityContext:
+      #   {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      # containers:
+      #   - name: {{ .Chart.Name }}
+      #     securityContext:
+      #       {{- toYaml .Values.securityContext | nindent 12 }}
+      #     image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+      #     imagePullPolicy: {{ .Values.image.pullPolicy }}
+      #     ports:
+      #       - name: http
+      #         containerPort: 80
+      #         protocol: TCP
+      #     livenessProbe:
+      #       httpGet:
+      #         path: /healthz
+      #         port: http
+      #     readinessProbe:
+      #       httpGet:
+      #         path: /readyz
+      #         port: http
+      #     resources:
+      #       {{- toYaml .Values.resources | nindent 12 }}
+      # {{- with .Values.nodeSelector }}
+      # nodeSelector:
+      #   {{- toYaml . | nindent 8 }}
+      # {{- end }}
+      # {{- with .Values.affinity }}
+      # affinity:
+      #   {{- toYaml . | nindent 8 }}
+      # {{- end }}
+      # {{- with .Values.tolerations }}
+      # tolerations:
+      #   {{- toYaml . | nindent 8 }}
+      # {{- end }}

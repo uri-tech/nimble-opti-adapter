@@ -1,4 +1,4 @@
-# values.yaml
+# ./helm/nimbleopticadapterconfig/values.yaml
 
 replicaCount: 1
 

@@ -44,6 +44,7 @@ minikube dashboard
 Clone the NimbleOpticAdapter repository to your local machine:
 
 ```bash
+# git clone -b uri-tech/diagrams-example https://github.com/uri-tech/NimbleOpticAdapter.git
 git clone -b main https://github.com/uri-tech/NimbleOpticAdapter.git
 cd NimbleOpticAdapter
 ```
@@ -65,13 +66,22 @@ helm template nimbleopticadapter ./helm/nimbleopticadapterconfig --output-dir ./
 Inspect the generated files in the output directory:
 
 ```bash
-ls -l ./output/nimbleopticadapter/templates
+tree -hapugD --dirsfirst --charset=utf-8 ./output
+nano ./output/nimbleopticadapterconfig/templates/deployment.yaml
 ```
 
 Install the NimbleOpticAdapter operator using Helm:
 
 ```bash
 helm install nimbleopticadapter ./helm/nimbleopticadapterconfig
+```
+
+Inspect the container using kubectl:
+
+```bash
+k -n default describe deployment nimbleopticadapterconfig-nimbleopticadapter
+k -n default describe pod <pod_name>
+k -n default logs <pod_name> <container_name>
 ```
 
 ## Step 4: Label the namespace

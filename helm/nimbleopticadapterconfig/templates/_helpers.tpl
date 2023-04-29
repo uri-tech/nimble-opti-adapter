@@ -14,16 +14,30 @@ app.kubernetes.io/name: {{ include "nimbleopticadapterconfig.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
-{{/* Generate the fullname for the resources */}}
-{{- define "nimbleopticadapterconfig.fullname" -}}
-{{- printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" }}
-{{- end -}}
-
 {{/* Generate the name of the service account */}}
 {{- define "nimbleopticadapterconfig.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
 {{- default (include "nimbleopticadapterconfig.fullname" .) .Values.serviceAccount.name }}
 {{- else }}
 {{- default "default" .Values.serviceAccount.name }}
+{{- end }}
+{{- end -}}
+
+{{/* Generate the chart name */}}
+{{- define "nimbleopticadapterconfig.chart" -}}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end -}}
+
+{{/* Generate the name */}}
+{{- define "nimbleopticadapterconfig.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- end -}}
+
+{{/* Generate the fullname */}}
+{{- define "nimbleopticadapterconfig.fullname" -}}
+{{- if .Values.fullnameOverride }}
+{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
+{{- else }}
+{{- printf "%s-%s" (include "nimbleopticadapterconfig.name" .) .Release.Name | trunc 63 | trimSuffix "-" }}
 {{- end }}
 {{- end -}}
