@@ -36,7 +36,7 @@ k get all -A
 Enable dashboard:
 
 ```bash
-minikube dashboard
+minikube dashboard &
 ```
 
 ## Step 2: Clone the NimbleOpticAdapter repository
