@@ -1,1 +1,43 @@
-A plain text file that is displayed to the user after the chart is installed. It often includes usage instructions or other important information.
+Thank you for installing {{ .Chart.Name }}.
+
+Your {{ .Chart.Name }} operator is up and running. Here are some important information and next steps to get started:
+
+1. Verify that the operator has been installed successfully:
+
+   kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+   You should see the {{ .Chart.Name }} operator pod running in the {{ .Release.Namespace }} namespace.
+
+2. Label the namespaces where you want the operator to manage certificates:
+
+   kubectl label namespace <your-target-namespace> nimble.opti.adapter/enabled="true"
+
+3. Create a {{ .Chart.Name }}Config custom resource in any labeled namespace:
+
+   Save the following YAML content to a file named `nimble-opti-adapterconfig.yaml`:
+
+   apiVersion: nimble-opti-adapter.example.com/v1alpha1
+   kind: nimble-opti-adapterConfig
+   metadata:
+     name: example-config
+   spec:
+     certificateRenewalThreshold: 30
+     annotationRemovalDelay: 60
+
+   Apply the configuration using kubectl:
+
+   kubectl apply -f nimble-opti-adapterconfig.yaml -n <your-target-namespace>
+
+4. Monitor the Prometheus metrics exposed by the operator:
+
+   - nimble-opti-adapter_certificate_renewals_total: Total number of certificate renewals
+   - nimble-opti-adapter_annotation_updates_duration_seconds: Duration (in seconds) of annotation updates during each renewal
+
+For more information and configuration options, please refer to the {{ .Chart.Name }} documentation:
+
+- GitHub repository: https://github.com/uri-tech/nimble-opti-adapter
+- README: https://github.com/uri-tech/nimble-opti-adapter/blob/master/README.md
+
+If you encounter any issues or need further assistance, please open an issue on the GitHub repository:
+
+- https://github.com/uri-tech/nimble-opti-adapter/issues

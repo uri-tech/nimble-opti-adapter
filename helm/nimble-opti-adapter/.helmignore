@@ -1,1 +1,31 @@
-<!-- .helmignore: This file specifies files and directories that should be ignored when packaging the chart. It follows the same syntax as .gitignore. -->
+# Patterns to ignore when building the package
+# This supports shell glob matching, relative path matching, and
+# negation (prefixed with !). Only one pattern per line.
+
+# Ignore all hidden files and directories
+.*
+# Ignore all backup files
+*~
+# Ignore all temporary files
+*.tmp
+*.bak
+*.swp
+*.log
+
+# Ignore version control directories
+.git/
+.svn/
+.hg/
+
+# Ignore the charts directory
+charts/
+# Ignore the examples directory
+examples/
+# Ignore the scripts directory
+scripts/
+# Ignore the test directory
+test/
+# Ignore the README and other documentation files
+README.md
+LICENSE
+CONTRIBUTING.md
