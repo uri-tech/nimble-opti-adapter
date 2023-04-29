@@ -1,4 +1,4 @@
-module github.com/uri-tech/NimbleOpticAdapter
+module github.com/uri-tech/nimble-opti-adapter
 
 go 1.19
 

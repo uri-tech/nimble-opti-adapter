@@ -1,9 +1,15 @@
----
+# permissions for end users to edit nimble-opti-adapterconfigs.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  creationTimestamp: null
-  name: manager-role
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: nimble-opti-adapterconfig-editor-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: nimbleoptiadapter
+    app.kubernetes.io/part-of: nimbleoptiadapter
+    app.kubernetes.io/managed-by: kustomize
+  name: nimble-opti-adapterconfig-editor-role
 rules:
   - apiGroups:
       - config.nimble-opti-adapter.tech-ua.com
@@ -20,14 +26,6 @@ rules:
   - apiGroups:
       - config.nimble-opti-adapter.tech-ua.com
     resources:
-      - nimble-opti-adapterconfigs/finalizers
-    verbs:
-      - update
-  - apiGroups:
-      - config.nimble-opti-adapter.tech-ua.com
-    resources:
       - nimble-opti-adapterconfigs/status
     verbs:
       - get
-      - patch
-      - update

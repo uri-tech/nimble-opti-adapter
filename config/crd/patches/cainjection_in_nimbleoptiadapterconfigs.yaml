@@ -4,4 +4,4 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     cert-manager.io/inject-ca-from: $(CERTIFICATE_NAMESPACE)/$(CERTIFICATE_NAME)
-  name: nimbleopticadapterconfigs.config.nimbleopticadapter.tech-ua.com
+  name: nimble-opti-adapterconfigs.config.nimble-opti-adapter.tech-ua.com

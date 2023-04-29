@@ -1,27 +1,27 @@
-# NimbleOpticAdapter
+# nimble-opti-adapter
 
 <!-- <p align="center">
-  <img src="https://example.com/icon.png" alt="NimbleOpticAdapter Icon" width="80" height="80">
+  <img src="https://example.com/icon.png" alt="nimble-opti-adapter Icon" width="80" height="80">
 </p> -->
 
 <p align="center">
-  <!-- <a href="https://github.com/uri-tech/NimbleOpticAdapter/actions">
-    <img alt="Build Status" src="https://github.com/uri-tech/NimbleOpticAdapter/workflows/build/badge.svg">
+  <!-- <a href="https://github.com/uri-tech/nimble-opti-adapter/actions">
+    <img alt="Build Status" src="https://github.com/uri-tech/nimble-opti-adapter/workflows/build/badge.svg">
   </a> -->
-  <a href="https://github.com/uri-tech/NimbleOpticAdapter/blob/master/LICENSE">
+  <a href="https://github.com/uri-tech/nimble-opti-adapter/blob/master/LICENSE">
     <img alt="License: Apache 2.0" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg">
   </a>
-  <a href="https://github.com/uri-tech/NimbleOpticAdapter/releases">
-    <img alt="GitHub release" src="https://img.shields.io/github/v/release/uri-tech/NimbleOpticAdapter">
+  <a href="https://github.com/uri-tech/nimble-opti-adapter/releases">
+    <img alt="GitHub release" src="https://img.shields.io/github/v/release/uri-tech/nimble-opti-adapter">
   </a>
-  <a href="https://github.com/uri-tech/NimbleOpticAdapter/issues">
-    <img alt="GitHub issues" src="https://img.shields.io/github/issues/uri-tech/NimbleOpticAdapter">
+  <a href="https://github.com/uri-tech/nimble-opti-adapter/issues">
+    <img alt="GitHub issues" src="https://img.shields.io/github/issues/uri-tech/nimble-opti-adapter">
   </a>
 </p>
 
-NimbleOpticAdapter is a Kubernetes operator that automates certificate renewal management when using ingress with the annotation `cert-manager.io/cluster-issuer` for services that require TLS communication. This operator is designed to work seamlessly with the NGINX ingress controller, efficiently handling the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation.
+nimble-opti-adapter is a Kubernetes operator that automates certificate renewal management when using ingress with the annotation `cert-manager.io/cluster-issuer` for services that require TLS communication. This operator is designed to work seamlessly with the NGINX ingress controller, efficiently handling the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation.
 
-<!-- ![NimbleOpticAdapter Diagram](diagram.png) -->
+<!-- ![nimble-opti-adapter Diagram](diagram.png) -->
 
 ## 🌟 Features
 
@@ -49,35 +49,35 @@ NimbleOpticAdapter is a Kubernetes operator that automates certificate renewal m
 ### Step 1: Clone the repository
 
 ```bash
-git clone https://github.com/uri-tech/NimbleOpticAdapter.git
-cd NimbleOpticAdapter
+git clone https://github.com/uri-tech/nimble-opti-adapter.git
+cd nimble-opti-adapter
 ```
 
 ### Step 2: Install the operator using Helm
 
 ```bash
-helm install nimbleopticadapter ./helm/nimbleopticadapterconfig
+helm install nimble-opti-adapter ./helm/nimble-opti-adapterconfig
 ```
 
 ### Step 3: Modify the operator
 
-To modify the operator, edit the Helm chart templates or values.yaml file in the helm/nimbleopticadapterconfig directory.
+To modify the operator, edit the Helm chart templates or values.yaml file in the helm/nimble-opti-adapterconfig directory.
 
 ### Step 4: Update the operator using Helm
 
 Repackage the Helm chart and upgrade the release with the following commands:
 
 ```bash
-cd NimbleOpticAdapter/helm/
-helm package nimbleopticadapterconfig
-helm upgrade nimbleopticadapter ./nimbleopticadapterconfig-0.1.0.tgz
+cd nimble-opti-adapter/helm/
+helm package nimble-opti-adapterconfig
+helm upgrade nimble-opti-adapter ./nimble-opti-adapterconfig-0.1.0.tgz
 ```
 
 ## ⚙️ Configuration
 
-Edit the `values.yaml` file in the `helm/nimbleopticadapterconfig` directory to customize the following parameters:
+Edit the `values.yaml` file in the `helm/nimble-opti-adapterconfig` directory to customize the following parameters:
 
-- `labelSelector`: The label selector for namespaces the operator will manage certificates in (default: `nimble.optic.adapter/enabled: 'true'`)
+- `labelSelector`: The label selector for namespaces the operator will manage certificates in (default: `nimble.opti.adapter/enabled: 'true'`)
 - `certificateRenewalThreshold`: The waiting time (in days) before the certificate expires to trigger renewal
 - `annotationRemovalDelay`: The delay (in seconds) after removing the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation before re-adding it
 
@@ -91,14 +91,14 @@ kind: Namespace
 metadata:
   name: your-target-namespace
   labels:
-    nimble.optic.adapter/enabled: "true"
+    nimble.opti.adapter/enabled: "true"
 ```
 
-Create a NimbleOpticAdapterConfig custom resource in any namespace:
+Create a nimble-opti-adapterConfig custom resource in any namespace:
 
 ```yaml
-apiVersion: nimbleopticadapter.example.com/v1alpha1
-kind: NimbleOpticAdapterConfig
+apiVersion: nimble-opti-adapter.example.com/v1alpha1
+kind: nimble-opti-adapterConfig
 metadata:
   name: example-config
 spec:
@@ -108,22 +108,22 @@ spec:
 
 ## 📊 Metrics
 
-NimbleOpticAdapter exposes the following Prometheus metrics:
+nimble-opti-adapter exposes the following Prometheus metrics:
 
-- `nimbleopticadapter_certificate_renewals_total`: Total number of certificate renewals
-- `nimbleopticadapter_annotation_updates_duration_seconds`: Duration (in seconds) of annotation updates during each renewal
+- `nimble-opti-adapter_certificate_renewals_total`: Total number of certificate renewals
+- `nimble-opti-adapter_annotation_updates_duration_seconds`: Duration (in seconds) of annotation updates during each renewal
 
 ## 🤝 Contributing
 
-We welcome contributions to the NimbleOpticAdapter project! Please see the [CONTRIBUTING.md](CONTRIBUTING.md) file for more information on how to contribute.
+We welcome contributions to the nimble-opti-adapter project! Please see the [CONTRIBUTING.md](CONTRIBUTING.md) file for more information on how to contribute.
 
 ## 📜 License
 
-NimbleOpticAdapter is licensed under the [Apache License, Version 2.0](LICENSE).
+nimble-opti-adapter is licensed under the [Apache License, Version 2.0](LICENSE).
 
 ## 📞 Support
 
-For any questions, bug reports, or feature requests, please open an issue on our [GitHub repository](https://github.com/uri-tech/NimbleOpticAdapter/issues).
+For any questions, bug reports, or feature requests, please open an issue on our [GitHub repository](https://github.com/uri-tech/nimble-opti-adapter/issues).
 
 <!-- ## Attribution
 
@@ -131,6 +131,6 @@ For any questions, bug reports, or feature requests, please open an issue on our
 
 Diagram: [Unsplash](https://unsplash.com/photos/U9s5m5L2Gn0) (License: CC0) -->
 
-<!-- git pull --allow-unrelated-histories https://github.com/uri-tech/NimbleOpticAdapter main -->
+<!-- git pull --allow-unrelated-histories https://github.com/uri-tech/nimble-opti-adapter main -->
 
-<!-- kubebuilder init --domain nimbleopticadapter.tech-ua.com --repo github.com/uri-tech/NimbleOpticAdapter -->
+<!-- kubebuilder init --domain nimble-opti-adapter.tech-ua.com --repo github.com/uri-tech/nimble-opti-adapter -->

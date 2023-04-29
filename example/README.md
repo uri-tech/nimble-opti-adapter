@@ -1,4 +1,4 @@
-## Install and Test NimbleOpticAdapter Operator Locally Using Minikube
+## Install and Test nimble-opti-adapter Operator Locally Using Minikube
 
 ### Prerequisites
 
@@ -39,14 +39,14 @@ Enable dashboard:
 minikube dashboard &
 ```
 
-## Step 2: Clone the NimbleOpticAdapter repository
+## Step 2: Clone the nimble-opti-adapter repository
 
-Clone the NimbleOpticAdapter repository to your local machine:
+Clone the nimble-opti-adapter repository to your local machine:
 
 ```bash
-# git clone -b uri-tech/diagrams-example https://github.com/uri-tech/NimbleOpticAdapter.git
-git clone -b main https://github.com/uri-tech/NimbleOpticAdapter.git
-cd NimbleOpticAdapter
+# git clone -b uri-tech/diagrams-example https://github.com/uri-tech/nimble-opti-adapter.git
+git clone -b main https://github.com/uri-tech/nimble-opti-adapter.git
+cd nimble-opti-adapter
 ```
 
 ## Step 3: Render the templates and install the operator using Helm
@@ -70,16 +70,16 @@ tree -hapugD --dirsfirst --charset=utf-8 ./output
 nano ./output/nimble-opti-adapter/templates/deployment.yaml
 ```
 
-Install the NimbleOpticAdapter operator using Helm:
+Install the nimble-opti-adapter operator using Helm:
 
 ```bash
-helm install nimbleopticadapter ./helm/nimble-opti-adapter
+helm install nimble-opti-adapter ./helm/nimble-opti-adapter --create-namespace --namespace nimble-opti-adapter
 ```
 
 Inspect the container using kubectl:
 
 ```bash
-k -n default describe deployment nimble-opti-adapter-nimbleopticadapter
+k -n default describe deployment nimble-opti-adapter-nimble-opti-adapter
 k -n default describe pod <pod_name>
 k -n default logs <pod_name> <container_name>
 ```
@@ -89,16 +89,16 @@ k -n default logs <pod_name> <container_name>
 Label the default namespace so that the operator will manage certificates in it:
 
 ```bash
-k label namespace default nimble.optic.adapter/enabled=true
+k label namespace default nimble.opti.adapter/enabled=true
 ```
 
-## Step 5: Create a NimbleOpticAdapterConfig custom resource
+## Step 5: Create a nimble-opti-adapterConfig custom resource
 
 Create a `nimble-opti-adapter.yaml` file with the following content:
 
 ```ymal
-apiVersion: nimbleopticadapter.example.com/v1alpha1
-kind: NimbleOpticAdapterConfig
+apiVersion: nimble-opti-adapter.example.com/v1alpha1
+kind: nimble-opti-adapterConfig
 metadata:
   name: example-config
 spec:
@@ -151,7 +151,7 @@ k apply -f example-ingress.yaml
 Apply the ingress resource:
 
 ```bash
-k logs -f -l app.kubernetes.io/name=nimbleopticadapter
+k logs -f -l app.kubernetes.io/name=nimble-opti-adapter
 ```
 
 ## Step 7: Cleanup
@@ -161,6 +161,6 @@ Once you've finished testing, you can delete the resources and stop Minikube:
 ```bash
 k delete -f example-ingress.yaml
 k delete -f nimble-opti-adapter.yaml
-helm uninstall nimbleopticadapter
+helm uninstall nimble-opti-adapter
 minikube stop
 ```

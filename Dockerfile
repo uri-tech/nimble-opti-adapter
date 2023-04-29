@@ -40,11 +40,11 @@ WORKDIR /
 
 # Set runtime labels
 LABEL org.label-schema.build-date=$BUILD_DATE \
-    org.label-schema.name="NimbleOpticAdapter" \
-    org.label-schema.description="NimbleOpticAdapter is a Kubernetes operator that automates certificate renewal management when using ingress with the annotation $(cert-manager.io/cluster-issuer) for services that require TLS communication." \
-    org.label-schema.url="https://github.com/uri-tech/NimbleOpticAdapter" \
+    org.label-schema.name="nimble-opti-adapter" \
+    org.label-schema.description="nimble-opti-adapter is a Kubernetes operator that automates certificate renewal management when using ingress with the annotation $(cert-manager.io/cluster-issuer) for services that require TLS communication." \
+    org.label-schema.url="https://github.com/uri-tech/nimble-opti-adapter" \
     org.label-schema.vcs-ref=$VCS_REF \
-    org.label-schema.vcs-url="https://github.com/uri-tech/NimbleOpticAdapter" \
+    org.label-schema.vcs-url="https://github.com/uri-tech/nimble-opti-adapter" \
     org.label-schema.vendor="uri-tech" \
     org.label-schema.version=$VERSION \
     org.label-schema.schema-version="1.0"

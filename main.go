@@ -36,8 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	configv1alpha1 "github.com/uri-tech/NimbleOpticAdapter/api/v1alpha1"
-	"github.com/uri-tech/NimbleOpticAdapter/controllers"
+	configv1alpha1 "github.com/uri-tech/nimble-opti-adapter/api/v1alpha1"
+	"github.com/uri-tech/nimble-opti-adapter/controllers"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -76,7 +76,7 @@ func main() {
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "37b5e221.nimbleopticadapter.tech-ua.com",
+		LeaderElectionID:       "37b5e221.nimbleoptiadapter.tech-ua.com",
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -94,13 +94,13 @@ func main() {
 	informerFactory := informers.NewSharedInformerFactoryWithOptions(kubeClient, 0)
 
 	// Add a new reconciler with the SecretInformer
-	if err = (&controllers.NimbleOpticAdapterConfigReconciler{
+	if err = (&controllers.NimbleOptiAdapterConfigReconciler{
 		Client:         mgr.GetClient(),
-		Log:            ctrl.Log.WithName("controllers").WithName("NimbleOpticAdapterConfig"),
+		Log:            ctrl.Log.WithName("controllers").WithName("NimbleOptiAdapterConfig"),
 		Scheme:         mgr.GetScheme(),
 		SecretInformer: informerFactory.Core().V1().Secrets(),
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NimbleOpticAdapterConfig")
+		setupLog.Error(err, "unable to create controller", "controller", "NimbleOptiAdapterConfig")
 		os.Exit(1)
 	}
 

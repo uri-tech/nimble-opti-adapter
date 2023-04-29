@@ -32,7 +32,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	configv1alpha1 "github.com/uri-tech/NimbleOpticAdapter/api/v1alpha1"
+	configv1alpha1 "github.com/uri-tech/nimble-opti-adapter/api/v1alpha1"
 	//+kubebuilder:scaffold:imports
 )
 

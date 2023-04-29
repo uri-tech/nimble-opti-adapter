@@ -1,4 +1,4 @@
-// ./api/v1alpha1/nimbleopticadapterconfig_types.go
+// ./api/v1alpha1/nimbleoptiadapterconfig_types.go
 
 /*
 Copyright 2023.
@@ -22,8 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// NimbleOpticAdapterConfigSpec defines the desired state of NimbleOpticAdapterConfig
-type NimbleOpticAdapterConfigSpec struct {
+// NimbleOptiAdapterConfigSpec defines the desired state of NimbleOptiAdapterConfig
+type NimbleOptiAdapterConfigSpec struct {
 	// TargetNamespace is the namespace where the operator should manage certificates
 	// +kubebuilder:validation:MinLength=1
 	TargetNamespace string `json:"targetNamespace"`
@@ -41,8 +41,8 @@ type NimbleOpticAdapterConfigSpec struct {
 	RenewalCheckInterval int `json:"renewalCheckInterval"`
 }
 
-// NimbleOpticAdapterConfigStatus defines the observed state of NimbleOpticAdapterConfig
-type NimbleOpticAdapterConfigStatus struct {
+// NimbleOptiAdapterConfigStatus defines the observed state of NimbleOptiAdapterConfig
+type NimbleOptiAdapterConfigStatus struct {
 	// Conditions are the conditions for this resource.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
@@ -53,24 +53,24 @@ type NimbleOpticAdapterConfigStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// NimbleOpticAdapterConfig is the Schema for the nimbleopticadapterconfigs API
-type NimbleOpticAdapterConfig struct {
+// NimbleOptiAdapterConfig is the Schema for the nimbleoptiadapterconfigs API
+type NimbleOptiAdapterConfig struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   NimbleOpticAdapterConfigSpec   `json:"spec,omitempty"`
-	Status NimbleOpticAdapterConfigStatus `json:"status,omitempty"`
+	Spec   NimbleOptiAdapterConfigSpec   `json:"spec,omitempty"`
+	Status NimbleOptiAdapterConfigStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// NimbleOpticAdapterConfigList contains a list of NimbleOpticAdapterConfig
-type NimbleOpticAdapterConfigList struct {
+// NimbleOptiAdapterConfigList contains a list of NimbleOptiAdapterConfig
+type NimbleOptiAdapterConfigList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []NimbleOpticAdapterConfig `json:"items"`
+	Items           []NimbleOptiAdapterConfig `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&NimbleOpticAdapterConfig{}, &NimbleOpticAdapterConfigList{})
+	SchemeBuilder.Register(&NimbleOptiAdapterConfig{}, &NimbleOptiAdapterConfigList{})
 }

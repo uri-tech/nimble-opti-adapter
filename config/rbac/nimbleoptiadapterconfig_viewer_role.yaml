@@ -1,0 +1,27 @@
+# permissions for end users to view nimble-opti-adapterconfigs.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: nimble-opti-adapterconfig-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: nimbleoptiadapter
+    app.kubernetes.io/part-of: nimbleoptiadapter
+    app.kubernetes.io/managed-by: kustomize
+  name: nimble-opti-adapterconfig-viewer-role
+rules:
+  - apiGroups:
+      - config.nimble-opti-adapter.tech-ua.com
+    resources:
+      - nimble-opti-adapterconfigs
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - config.nimble-opti-adapter.tech-ua.com
+    resources:
+      - nimble-opti-adapterconfigs/status
+    verbs:
+      - get

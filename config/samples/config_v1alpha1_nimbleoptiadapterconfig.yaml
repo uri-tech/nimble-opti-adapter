@@ -1,0 +1,12 @@
+apiVersion: config.nimble-opti-adapter.tech-ua.com/v1alpha1
+kind: nimble-opti-adapterConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: nimble-opti-adapterconfig
+    app.kubernetes.io/instance: nimble-opti-adapterconfig-sample
+    app.kubernetes.io/part-of: nimbleoptiadapter
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: nimbleoptiadapter
+  name: nimble-opti-adapterconfig-sample
+spec:
+  # TODO(user): Add fields here
