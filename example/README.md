@@ -8,23 +8,68 @@
 
 ### Step 1: Start Minikube
 
-Start Minikube with the following command:
+Start Minikube as non-root with the following command:
 
 ```bash
 minikube start
 ```
 
+List the available contexts using the following command:
+
+```bash
+kubectl config get-contexts
+```
+
+Change the context to work with Minikube command:
+
+```bash
+kubectl config use-context minikube
+```
+
+Create a shortcut and check if the cluster was created successfully:
+
+```bash
+alias k="minikube kubectl --"
+k get all -A
+```
+
+Enable dashboard:
+
+```bash
+minikube dashboard
+```
+
 ## Step 2: Clone the NimbleOpticAdapter repository
 
 Clone the NimbleOpticAdapter repository to your local machine:
+
 ```bash
-git clone https://github.com/uri-tech/NimbleOpticAdapter.git
+git clone -b main https://github.com/uri-tech/NimbleOpticAdapter.git
 cd NimbleOpticAdapter
 ```
 
-## Step 3: Install the operator using Helm
+## Step 3: Render the templates and install the operator using Helm
+
+Create an output directory for saving the rendered templates:
+
+```bash
+mkdir output
+```
+
+Run the helm template command to render the templates and save them in the output directory:
+
+```bash
+helm template nimbleopticadapter ./helm/nimbleopticadapterconfig --output-dir ./output
+```
+
+Inspect the generated files in the output directory:
+
+```bash
+ls -l ./output/nimbleopticadapter/templates
+```
 
 Install the NimbleOpticAdapter operator using Helm:
+
 ```bash
 helm install nimbleopticadapter ./helm/nimbleopticadapterconfig
 ```
@@ -32,13 +77,15 @@ helm install nimbleopticadapter ./helm/nimbleopticadapterconfig
 ## Step 4: Label the namespace
 
 Label the default namespace so that the operator will manage certificates in it:
+
 ```bash
-kubectl label namespace default nimble.optic.adapter/enabled=true
+k label namespace default nimble.optic.adapter/enabled=true
 ```
 
 ## Step 5: Create a NimbleOpticAdapterConfig custom resource
 
 Create a `nimbleopticadapterconfig.yaml` file with the following content:
+
 ```ymal
 apiVersion: nimbleopticadapter.example.com/v1alpha1
 kind: NimbleOpticAdapterConfig
@@ -50,13 +97,15 @@ spec:
 ```
 
 Apply the configuration:
+
 ```bash
-kubectl apply -f nimbleopticadapterconfig.yaml
+k apply -f nimbleopticadapterconfig.yaml
 ```
 
 ## Step 6: Test the operator
 
 To test the operator, you can create an example ingress resource that requires TLS communication. Save the following content in a file named `example-ingress.yaml`:
+
 ```ymal
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -84,21 +133,24 @@ spec:
 ```
 
 Apply the ingress resource:
+
 ```bash
-kubectl apply -f example-ingress.yaml
+k apply -f example-ingress.yaml
 ```
 
 Apply the ingress resource:
+
 ```bash
-kubectl logs -f -l app.kubernetes.io/name=nimbleopticadapter
+k logs -f -l app.kubernetes.io/name=nimbleopticadapter
 ```
 
 ## Step 7: Cleanup
 
 Once you've finished testing, you can delete the resources and stop Minikube:
+
 ```bash
-kubectl delete -f example-ingress.yaml
-kubectl delete -f nimbleopticadapterconfig.yaml
+k delete -f example-ingress.yaml
+k delete -f nimbleopticadapterconfig.yaml
 helm uninstall nimbleopticadapter
 minikube stop
 ```

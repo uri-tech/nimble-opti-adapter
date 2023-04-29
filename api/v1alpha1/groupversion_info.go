@@ -1,4 +1,4 @@
-// groupversion_info.go
+// ./api/v1alpha1/groupversion_info.go
 
 /*
 Copyright 2023.

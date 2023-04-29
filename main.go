@@ -1,4 +1,4 @@
-// main.go
+// ./main.go
 
 /*
 Copyright 2023.

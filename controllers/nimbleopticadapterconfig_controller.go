@@ -1,4 +1,4 @@
-// nimbleopticadapterconfig_controller.go
+// ./controllers/nimbleopticadapterconfig_controller.go
 
 /*
 Copyright 2023.

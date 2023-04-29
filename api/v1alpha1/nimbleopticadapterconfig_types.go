@@ -1,4 +1,4 @@
-// nimbleopticadapterconfig_types.go
+// ./api/v1alpha1/nimbleopticadapterconfig_types.go
 
 /*
 Copyright 2023.

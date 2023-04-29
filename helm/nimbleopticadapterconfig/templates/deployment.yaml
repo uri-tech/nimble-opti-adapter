@@ -1,4 +1,4 @@
-# deployment.yaml
+# ./helm/nimbleopticadapterconfig/templates/deployment.yaml
 
 apiVersion: apps/v1
 kind: Deployment

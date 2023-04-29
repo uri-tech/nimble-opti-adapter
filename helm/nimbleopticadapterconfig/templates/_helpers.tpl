@@ -14,6 +14,11 @@ app.kubernetes.io/name: {{ include "nimbleopticadapterconfig.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 
+{{/* Generate the fullname for the resources */}}
+{{- define "nimbleopticadapterconfig.fullname" -}}
+{{- printf "%s-%s" .Release.Name .Chart.Name | trunc 63 | trimSuffix "-" }}
+{{- end -}}
+
 {{/* Generate the name of the service account */}}
 {{- define "nimbleopticadapterconfig.serviceAccountName" -}}
 {{- if .Values.serviceAccount.create }}
