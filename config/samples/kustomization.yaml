@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- nimbleoptiadapter_v1_nimbleoptiadapter.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

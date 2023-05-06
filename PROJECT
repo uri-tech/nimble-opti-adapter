@@ -2,19 +2,19 @@
 # This file is used to track the info used to scaffold your project
 # and allow the plugins properly work.
 # More info: https://book.kubebuilder.io/reference/project-config.html
-domain: nimble-opti-adapter.tech-ua.com
+domain: nimble-opti-adapter.example.com
 layout:
-- go.kubebuilder.io/v3
-projectName: nimbleoptiadapter
+- go.kubebuilder.io/v4
+projectName: bbb
 repo: github.com/uri-tech/nimble-opti-adapter
 resources:
 - api:
     crdVersion: v1
     namespaced: true
   controller: true
-  domain: nimble-opti-adapter.tech-ua.com
-  group: config
-  kind: nimble-opti-adapterConfig
-  path: github.com/uri-tech/nimble-opti-adapter/api/v1alpha1
-  version: v1alpha1
+  domain: nimble-opti-adapter.example.com
+  group: nimbleoptiadapter
+  kind: NimbleOptiAdapter
+  path: github.com/uri-tech/nimble-opti-adapter/api/v1
+  version: v1
 version: "3"

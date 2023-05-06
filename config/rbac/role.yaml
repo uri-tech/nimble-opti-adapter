@@ -5,29 +5,29 @@ metadata:
   creationTimestamp: null
   name: manager-role
 rules:
-  - apiGroups:
-      - config.nimble-opti-adapter.tech-ua.com
-    resources:
-      - nimble-opti-adapterconfigs
-    verbs:
-      - create
-      - delete
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - config.nimble-opti-adapter.tech-ua.com
-    resources:
-      - nimble-opti-adapterconfigs/finalizers
-    verbs:
-      - update
-  - apiGroups:
-      - config.nimble-opti-adapter.tech-ua.com
-    resources:
-      - nimble-opti-adapterconfigs/status
-    verbs:
-      - get
-      - patch
-      - update
+- apiGroups:
+  - nimbleoptiadapter.nimble-opti-adapter.example.com
+  resources:
+  - nimbleoptiadapters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - nimbleoptiadapter.nimble-opti-adapter.example.com
+  resources:
+  - nimbleoptiadapters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - nimbleoptiadapter.nimble-opti-adapter.example.com
+  resources:
+  - nimbleoptiadapters/status
+  verbs:
+  - get
+  - patch
+  - update

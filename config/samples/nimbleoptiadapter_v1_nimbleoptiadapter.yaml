@@ -1,0 +1,12 @@
+apiVersion: nimbleoptiadapter.nimble-opti-adapter.example.com/v1
+kind: NimbleOptiAdapter
+metadata:
+  labels:
+    app.kubernetes.io/name: nimbleoptiadapter
+    app.kubernetes.io/instance: nimbleoptiadapter-sample
+    app.kubernetes.io/part-of: bbb
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: bbb
+  name: nimbleoptiadapter-sample
+spec:
+  # TODO(user): Add fields here
