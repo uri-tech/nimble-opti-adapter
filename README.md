@@ -5,9 +5,9 @@
 </p> -->
 
 <p align="center">
-  <!-- <a href="https://github.com/uri-tech/nimble-opti-adapter/actions">
-    <img alt="Build Status" src="https://github.com/uri-tech/nimble-opti-adapter/workflows/build/badge.svg">
-  </a> -->
+  <a href="https://github.com/uri-tech/nimble-opti-adapter/actions">
+    <img alt="Build Status" src="https://github.com/uri-tech/nimble-opti-adapter/diagrams/main.png">
+  </a>
   <a href="https://github.com/uri-tech/nimble-opti-adapter/blob/master/LICENSE">
     <img alt="License: Apache 2.0" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg">
   </a>
@@ -20,6 +20,33 @@
 </p>
 
 nimble-opti-adapter is a Kubernetes operator that automates certificate renewal management when using ingress with the annotation `cert-manager.io/cluster-issuer` for services that require TLS communication. This operator is designed to work seamlessly with the NGINX ingress controller, efficiently handling the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation.
+
+## ⚙️ Operator Workflow
+
+The operator monitors the creation and modification of both CustomResourceDefinitions (CRDs) of kind `NimbleOptiAdapter` and Ingress resources. The following is a detailed overview of the operator's behavior:
+
+1. If a CRD of kind `nimble-opti-adapter` is created or modified, the operator currently performs no action.
+
+2. When an Ingress resource is created or modified, the operator's controller checks for the presence of the `nimble.opti.adapter/enabled: "true"` label:
+
+   - If the label does not exist, the operator takes no action.
+   - If the label exists, the operator checks for the presence of a `NimbleOptiAdapter` CRD in the same namespace:
+     - If the CRD does not exist, the operator creates a new `NimbleOptiAdapter` CRD with default values and proceeds as if the CRD already existed.
+     - If the CRD exists, the operator checks if any path in `spec.rules[].http.paths[].path` contains `.well-known/acme-challenge`. If so, the operator initiates the certificate renewal process for the Ingress resource.
+
+3. Once a day, the operator checks all Ingress resources with the label `nimble.opti.adapter/enabled: "true"` and associated `NimbleOptiAdapter` CRD resource in the same namespace:
+
+   - If there is no match, the operator takes no action.
+   - If there is a match, the operator checks if the Secret name specified in `spec.tls[].secretName` exists for each tls[], retrieves the Secret, and calculates the time remaining until the certificate expires:
+     - If the certificate expires in equal or fewer days than the `CertificateRenewalThreshold` specified in the `NimbleOptiAdapter` resource in the same namespace, the operator initiates the certificate renewal process.
+     - If the certificate expires in more days than the `CertificateRenewalThreshold` specified in the `NimbleOptiAdapter` resource in the same namespace, the operator checks if any path in `spec.rules[].http.paths[].path` contains `.well-known/acme-challenge`:
+       - If there is no match, the operator takes no action.
+       - If there is a match, the operator initiates the certificate renewal process.
+
+4. Certificate renewal process:
+   - Remove the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation from the Ingress resource.
+   - Start a timer and wait until either there is no `spec.rules[].http.paths[].path` containing `.well-known/acme-challenge`, or the `AnnotationRemovalDelay` time specified in the `NimbleOptiAdapter` CRD resource has passed.
+   - Re-add the annotation `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` to the Ingress resource.
 
 <!-- ![nimble-opti-adapter Diagram](diagram.png) -->
 
@@ -83,22 +110,22 @@ Edit the `values.yaml` file in the `helm/nimble-opti-adapterconfig` directory to
 
 ## 📝 Usage
 
-Label the namespaces where the operator should manage certificates:
+Label the Ingress where the operator should manage certificates:
 
 ```yaml
 apiVersion: v1
-kind: Namespace
+kind: Ingress
 metadata:
-  name: your-target-namespace
+  name: your-target-ingress
   labels:
     nimble.opti.adapter/enabled: "true"
 ```
 
-Create a nimble-opti-adapterConfig custom resource in any namespace:
+Create a nimble-opti-adapter custom resource in any namespace:
 
 ```yaml
 apiVersion: nimble-opti-adapter.example.com/v1alpha1
-kind: nimble-opti-adapterConfig
+kind: nimble-opti-adapter
 metadata:
   name: example-config
 spec:
