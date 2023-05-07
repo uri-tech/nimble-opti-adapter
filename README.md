@@ -19,7 +19,7 @@
     <img alt="GitHub issues" src="https://img.shields.io/github/issues/uri-tech/nimble-opti-adapter">
   </a>
 </p>
-<p><i>The Nimble-Opti-Adapter is a specialized Kubernetes operator designed to cater to specific use cases. It is tailored for Kubernetes clusters that have already integrated the Cert-Manager and Nginx-Ingress operators and employ Let's Encrypt as the certificate authority to obtain signed SSL certificates via the annotation `acme.cert-manager.io/http01-edit-in-place: true` in the ingress and also need the annotation `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` for the service to be accessible through the ingress.
+<p><i>The nimble-opti-adapter is a purpose-built Kubernetes operator tailored to address specific scenarios. It is designed for Kubernetes clusters that have already incorporated the Cert-Manager and Nginx-Ingress operators, and utilize Let's Encrypt as the certificate authority for obtaining signed SSL certificates through the annotation `acme.cert-manager.io/http01-edit-in-place: true` in the ingress. Furthermore, the ingress need the annotation `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` for the service to be accessible.The operator effectively resolves the challenge of automatic certificate renewal in this context, as the HTTP01 Ingress resolver is incompatible with this case.
 </i></p>
 
 nimble-opti-adapter is a Kubernetes operator that automates certificate renewal management when using ingress with the annotation `cert-manager.io/cluster-issuer` for services that require TLS communication. This operator is designed to work seamlessly with the NGINX ingress controller, efficiently handling the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation.
