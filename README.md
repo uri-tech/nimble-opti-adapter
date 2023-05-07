@@ -1,13 +1,13 @@
 # nimble-opti-adapter
 
-<!-- <p align="center">
-  <img src="https://example.com/icon.png" alt="nimble-opti-adapter Icon" width="80" height="80">
-</p> -->
+<p align="center">
+  <img src="diagrams/main.png" alt="nimble-opti-adapter diagrams" width="300" height="300">
+</p>
 
 <p align="center">
-  <a href="https://github.com/uri-tech/nimble-opti-adapter/actions">
-    <img alt="Build Status" src="https://github.com/uri-tech/nimble-opti-adapter/diagrams/main.png">
-  </a>
+  <!-- <a href="https://github.com/uri-tech/nimble-opti-adapter/actions">
+    <img alt="Build Status" src="diagrams/main.png">
+  </a> -->
   <a href="https://github.com/uri-tech/nimble-opti-adapter/blob/master/LICENSE">
     <img alt="License: Apache 2.0" src="https://img.shields.io/badge/License-Apache%202.0-blue.svg">
   </a>
