@@ -1,12 +1,9 @@
 <mxfile host="65bd71144e">
     <diagram name="Description" id="_o2L3f9pjlHrbbuKHUoa">
-        <mxGraphModel dx="4629" dy="912" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1000" math="0" shadow="0">
+        <mxGraphModel dx="4749" dy="2737" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1000" math="0" shadow="0">
             <root>
                 <mxCell id="XLajMpSWsyHqntTYuPn4-0"/>
                 <mxCell id="XLajMpSWsyHqntTYuPn4-1" parent="XLajMpSWsyHqntTYuPn4-0"/>
-                <mxCell id="147" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=default;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://d33wubrfki0l68.cloudfront.net/58f123041ee28fd283183b7a9433f0515fea8d7e/e7b9d/static/graphic_what-are-kubernetes-operators.png;" parent="XLajMpSWsyHqntTYuPn4-1" vertex="1">
-                    <mxGeometry x="-1760" y="1640" width="520" height="260" as="geometry"/>
-                </mxCell>
                 <mxCell id="148" value="" style="group" parent="XLajMpSWsyHqntTYuPn4-1" vertex="1" connectable="0">
                     <mxGeometry x="-2130" y="450" width="1450" height="1102" as="geometry"/>
                 </mxCell>
@@ -101,7 +98,7 @@
         </mxGraphModel>
     </diagram>
     <diagram name="Copy of Description" id="haG0jc73lLNSSZobCQfu">
-        <mxGraphModel dx="6057" dy="1709" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1000" math="0" shadow="0">
+        <mxGraphModel dx="4749" dy="2737" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="1000" math="0" shadow="0">
             <root>
                 <mxCell id="4ndF_vWXKTqFUOwAZVbW-0"/>
                 <mxCell id="4ndF_vWXKTqFUOwAZVbW-1" parent="4ndF_vWXKTqFUOwAZVbW-0"/>
@@ -194,6 +191,9 @@
                         <mxPoint x="730" y="548.5" as="sourcePoint"/>
                         <mxPoint x="860" y="548.5" as="targetPoint"/>
                     </mxGeometry>
+                </mxCell>
+                <mxCell id="6apvZShQdil9UfdfVGLR-0" value="" style="shape=image;verticalLabelPosition=bottom;labelBackgroundColor=default;verticalAlign=top;aspect=fixed;imageAspect=0;image=https://d33wubrfki0l68.cloudfront.net/58f123041ee28fd283183b7a9433f0515fea8d7e/e7b9d/static/graphic_what-are-kubernetes-operators.png;" vertex="1" parent="4ndF_vWXKTqFUOwAZVbW-1">
+                    <mxGeometry x="-1760" y="1640" width="520" height="260" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>
