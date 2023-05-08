@@ -1,5 +1,8 @@
 # nimble-opti-adapter
 
+<p><i>The nimble-opti-adapter is a purpose-built Kubernetes operator tailored to address specific scenarios. It is designed for Kubernetes clusters that have already incorporated the Cert-Manager and Nginx-Ingress operators, and utilize Let's Encrypt as the certificate authority for obtaining signed SSL certificates through the annotation `acme.cert-manager.io/http01-edit-in-place: true` in the ingress. Furthermore, the ingress need the annotation `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` for the service to be accessible.The operator effectively resolves the challenge of automatic certificate renewal in this context, as the HTTP01 Ingress resolver is incompatible with this case.
+</i></p>
+
 <p align="center">
   <!-- <img src="diagrams/main.png" alt="nimble-opti-adapter diagrams" width="300" height="300"> -->
   <img src="diagrams/main.png" alt="nimble-opti-adapter diagrams">
@@ -19,8 +22,6 @@
     <img alt="GitHub issues" src="https://img.shields.io/github/issues/uri-tech/nimble-opti-adapter">
   </a>
 </p>
-<p><i>The nimble-opti-adapter is a purpose-built Kubernetes operator tailored to address specific scenarios. It is designed for Kubernetes clusters that have already incorporated the Cert-Manager and Nginx-Ingress operators, and utilize Let's Encrypt as the certificate authority for obtaining signed SSL certificates through the annotation `acme.cert-manager.io/http01-edit-in-place: true` in the ingress. Furthermore, the ingress need the annotation `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` for the service to be accessible.The operator effectively resolves the challenge of automatic certificate renewal in this context, as the HTTP01 Ingress resolver is incompatible with this case.
-</i></p>
 
 nimble-opti-adapter is a Kubernetes operator that automates certificate renewal management when using ingress with the annotation `cert-manager.io/cluster-issuer` for services that require TLS communication. This operator is designed to work seamlessly with the NGINX ingress controller, efficiently handling the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation.
 
