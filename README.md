@@ -29,31 +29,22 @@ nimble-opti-adapter is a Kubernetes operator that automates certificate renewal 
 
 The operator monitors the creation and modification of both CustomResourceDefinitions (CRDs) of kind `NimbleOptiAdapter` and Ingress resources. The following is a detailed overview of the operator's behavior:
 
-1. If a CRD of kind `nimble-opti-adapter` is created or modified, the operator currently performs no action.
+1. 🚫 The operator is currently configured to ignore creation or modification events on `NimbleOptiAdapter` CRDs.
 
-2. When an Ingress resource is created or modified, the operator's controller checks for the presence of the `nimble.opti.adapter/enabled: "true"` label:
+2. 🚦 Upon Ingress resource events, the operator verifies the existence of the `nimble.opti.adapter/enabled: "true"` label:
+   - In the absence of this label, the operator remains passive.
+   - If the label is present, it validates the existence of a `NimbleOptiAdapter` CRD within the same namespace. If the CRD is missing, a new `NimbleOptiAdapter` CRD is instantiated with default values. If the CRD already exists, the operator scans for any path in `spec.rules[].http.paths[].path` containing `.well-known/acme-challenge`. If found, the certificate renewal process for the Ingress resource is triggered.
 
-   - If the label does not exist, the operator takes no action.
-   - If the label exists, the operator checks for the presence of a `NimbleOptiAdapter` CRD in the same namespace:
-     - If the CRD does not exist, the operator creates a new `NimbleOptiAdapter` CRD with default values and proceeds as if the CRD already existed.
-     - If the CRD exists, the operator checks if any path in `spec.rules[].http.paths[].path` contains `.well-known/acme-challenge`. If so, the operator initiates the certificate renewal process for the Ingress resource.
+3. 📆 The operator runs a daily audit of all Ingress resources with the `nimble.opti.adapter/enabled: "true"` label and associated `NimbleOptiAdapter` CRD in the same namespace:
+   - In the absence of matching resources, no action is taken.
+   - If matches are found, the operator fetches the associated Secret referenced in `spec.tls[].secretName` for each tls[], calculates the remaining time until certificate expiry and checks it against the `CertificateRenewalThreshold` specified in the `NimbleOptiAdapter` CRD. If the certificate is due to expire within or on the threshold, certificate renewal is initiated.
 
-3. Once a day, the operator checks all Ingress resources with the label `nimble.opti.adapter/enabled: "true"` and associated `NimbleOptiAdapter` CRD resource in the same namespace:
-
-   - If there is no match, the operator takes no action.
-   - If there is a match, the operator checks if the Secret name specified in `spec.tls[].secretName` exists for each tls[], retrieves the Secret, and calculates the time remaining until the certificate expires:
-     - If the certificate expires in equal or fewer days than the `CertificateRenewalThreshold` specified in the `NimbleOptiAdapter` resource in the same namespace, the operator initiates the certificate renewal process.
-     - If the certificate expires in more days than the `CertificateRenewalThreshold` specified in the `NimbleOptiAdapter` resource in the same namespace, the operator checks if any path in `spec.rules[].http.paths[].path` contains `.well-known/acme-challenge`:
-       - If there is no match, the operator takes no action.
-       - If there is a match, the operator initiates the certificate renewal process.
-
-4. Certificate renewal process:
-   - Remove the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation from the Ingress resource.
-   - Start a timer and wait until either there is no `spec.rules[].http.paths[].path` containing `.well-known/acme-challenge`, or the `AnnotationRemovalDelay` time specified in the `NimbleOptiAdapter` CRD resource has passed.
-   - Send to prometheus endpoint duration (in seconds) of annotation updates during renewal through `nimble-opti-adapter_annotation_updates_duration_seconds`
-   - Re-add the annotation `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` to the Ingress resource.
-   - Increment `nimble-opti-adapter_certificate_renewals_total` and send to prometheus endpoint.
-
+4. 🔄 The certificate renewal process involves the following steps:
+   - The `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation is temporarily stripped from the Ingress resource.
+   - A timer kicks in, waiting for the absence of `spec.rules[].http.paths[].path` containing `.well-known/acme-challenge` or for the lapse of the `AnnotationRemovalDelay` specified in the `NimbleOptiAdapter` CRD.
+   - The duration of annotation updates during renewal is captured as `nimble-opti-adapter_annotation_updates_duration_seconds` and dispatched to a Prometheus endpoint.
+   - The `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation is reinstated on the Ingress resource.
+   - The counter `nimble-opti-adapter_certificate_renewals_total` is incremented and sent to a Prometheus endpoint.
 <!-- ![nimble-opti-adapter Diagram](diagram.png) -->
 
 ## 🌟 Features
