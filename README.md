@@ -1,6 +1,6 @@
 # nimble-opti-adapter
 
-<p><i>The nimble-opti-adapter is a purpose-built Kubernetes operator tailored to address specific scenarios. It is designed for Kubernetes clusters that have already incorporated the Cert-Manager operator and Nginx-Ingress controller, and utilize Let's Encrypt as the certificate authority for obtaining signed SSL certificates through the annotation `acme.cert-manager.io/http01-edit-in-place: true` in the ingress. Furthermore, the ingress need the annotation `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` for the service to be accessible.The operator effectively resolves the challenge of automatic certificate renewal in this context, as the HTTP01 Ingress resolver is incompatible with this case.
+<p><i>The Nimble-Opti-Adapter is a dedicated Kubernetes operator engineered to handle specific use cases. It's targeted towards Kubernetes clusters that have already integrated the Cert-Manager operator and Nginx-Ingress controller, and use Let's Encrypt as their certificate authority for acquiring SSL certificates validated through the `acme.cert-manager.io/http01-edit-in-place: true` annotation in the ingress. Moreover, the ingress requires the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation to ensure service accessibility. The operator proficiently addresses the issue of auto-renewal of certificates in this scenario, given that the HTTP01 Ingress resolver doesn't align with this setup.
 </i></p>
 
 <p align="center">
@@ -50,7 +50,9 @@ The operator monitors the creation and modification of both CustomResourceDefini
 4. Certificate renewal process:
    - Remove the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation from the Ingress resource.
    - Start a timer and wait until either there is no `spec.rules[].http.paths[].path` containing `.well-known/acme-challenge`, or the `AnnotationRemovalDelay` time specified in the `NimbleOptiAdapter` CRD resource has passed.
+   - Send to prometheus endpoint duration (in seconds) of annotation updates during renewal through nimble-opti-adapter_annotation_updates_duration_seconds
    - Re-add the annotation `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` to the Ingress resource.
+   - Increment nimble-opti-adapter_certificate_renewals_total and send to prometheus endpoint.
 
 <!-- ![nimble-opti-adapter Diagram](diagram.png) -->
 
@@ -76,7 +78,6 @@ The operator monitors the creation and modification of both CustomResourceDefini
 - [Helm (v3+)](https://helm.sh/docs/intro/install)
 - [Cert-Manager operator](https://github.com/cert-manager/cert-manager)
 - [Ingress NGINX Controller](https://github.com/kubernetes/ingress-nginx)
-
 
 ## 🚀 Quick Start
 
