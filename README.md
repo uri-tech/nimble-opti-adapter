@@ -50,9 +50,9 @@ The operator monitors the creation and modification of both CustomResourceDefini
 4. Certificate renewal process:
    - Remove the `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation from the Ingress resource.
    - Start a timer and wait until either there is no `spec.rules[].http.paths[].path` containing `.well-known/acme-challenge`, or the `AnnotationRemovalDelay` time specified in the `NimbleOptiAdapter` CRD resource has passed.
-   - Send to prometheus endpoint duration (in seconds) of annotation updates during renewal through nimble-opti-adapter_annotation_updates_duration_seconds
+   - Send to prometheus endpoint duration (in seconds) of annotation updates during renewal through `nimble-opti-adapter_annotation_updates_duration_seconds`
    - Re-add the annotation `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` to the Ingress resource.
-   - Increment nimble-opti-adapter_certificate_renewals_total and send to prometheus endpoint.
+   - Increment `nimble-opti-adapter_certificate_renewals_total` and send to prometheus endpoint.
 
 <!-- ![nimble-opti-adapter Diagram](diagram.png) -->
 
