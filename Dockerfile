@@ -22,16 +22,16 @@ COPY go.sum go.sum
 RUN go mod download
 
 # Copy the go source
-COPY main.go main.go
+COPY cmd/main.go cmd/main.go
 COPY api/ api/
-COPY controllers/ controllers/
+COPY internal/controller/ internal/controller/
 
 # Build
 # the GOARCH has no default value to allow the binary be built according to the host where the command
 # was called. For example, if we call make docker-build in a local env which has the Apple Silicon M1 SO
 # the docker BUILDPLATFORM arg will be linux/arm64 when for Apple x86 it will be linux/amd64. Therefore,
 # by leaving it empty we can ensure that the container and binary shipped on it will have the same platform.
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
 # Use distroless as minimal base image to package the manager binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
@@ -40,11 +40,11 @@ WORKDIR /
 
 # Set runtime labels
 LABEL org.label-schema.build-date=$BUILD_DATE \
-    org.label-schema.name="NimbleOpticAdapter" \
-    org.label-schema.description="NimbleOpticAdapter is a Kubernetes operator that automates certificate renewal management when using ingress with the annotation $(cert-manager.io/cluster-issuer) for services that require TLS communication." \
-    org.label-schema.url="https://github.com/uri-tech/NimbleOpticAdapter" \
+    org.label-schema.name="nimble-opti-adapter" \
+    org.label-schema.description="nimble-opti-adapter is a Kubernetes operator that automates certificate renewal management when using ingress with the annotation $(cert-manager.io/cluster-issuer) for services that require TLS communication." \
+    org.label-schema.url="https://github.com/uri-tech/nimble-opti-adapter" \
     org.label-schema.vcs-ref=$VCS_REF \
-    org.label-schema.vcs-url="https://github.com/uri-tech/NimbleOpticAdapter" \
+    org.label-schema.vcs-url="https://github.com/uri-tech/nimble-opti-adapter" \
     org.label-schema.vendor="uri-tech" \
     org.label-schema.version=$VERSION \
     org.label-schema.schema-version="1.0"
