@@ -3,153 +3,76 @@
 package controller
 
 import (
-	"context"
-	"crypto/x509"
-	"fmt"
-	"strings"
 	"time"
 
+	"github.com/golang/glog"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/klog/v2"
 )
 
-// IngressWatcher watches for Ingress resource events using a shared informer.
+// IngressWatcher is a structure that holds the Client for Kubernetes
+// API communication and IngressInformer for caching Ingress resources.
 type IngressWatcher struct {
-	Client                  kubernetes.Interface      // Kubernetes client
-	IngressInformer         cache.SharedIndexInformer // Shared informer for Ingress resources
-	NimbleOptiAdapterClient nimbleoptiadapterclientset.Interface
+	Client          kubernetes.Interface
+	IngressInformer cache.SharedIndexInformer
 }
 
-// NewIngressWatcher initializes a new IngressWatcher with the provided Kubernetes client.
+// NewIngressWatcher initializes a new IngressWatcher and starts
+// an IngressInformer for caching Ingress resources.
 func NewIngressWatcher(client kubernetes.Interface) *IngressWatcher {
 	iw := &IngressWatcher{
 		Client: client,
 	}
-	iw.NimbleOptiAdapterClient = nimbleOptiAdapterClient
 
-	// Initialize a new shared informer factory and create an informer for Ingress resources.
+	// Using SharedIndexInformer to cache Ingress resources
 	informerFactory := informers.NewSharedInformerFactory(client, 0)
 	iw.IngressInformer = informerFactory.Networking().V1().Ingresses().Informer()
+	iw.IngressInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+		UpdateFunc: iw.handleIngressUpdate,
+	})
+
+	// Starting IngressInformer
+	go iw.IngressInformer.Run(make(chan struct{}))
 
 	return iw
 }
 
-// Start starts the IngressWatcher and begins watching for Ingress resource events.
-func (iw *IngressWatcher) Start(stopCh <-chan struct{}) {
-	// Add event handlers for the Add and Update events on Ingress resources.
-	iw.IngressInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			ing := obj.(*networkingv1.Ingress)
-			iw.handleIngressUpdate(ing)
-		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
-			ing := newObj.(*networkingv1.Ingress)
-			iw.handleIngressUpdate(ing)
-		},
-	})
-
-	klog.Info("Starting Ingress Watcher")
-
-	// Run the informer and wait for it to sync with the Kubernetes API server.
-	go iw.IngressInformer.Run(stopCh)
-
-	// Check if the informer cache has synced.
-	if !cache.WaitForCacheSync(stopCh, iw.IngressInformer.HasSynced) {
-		runtime.HandleError(fmt.Errorf("Timed out waiting for caches to sync"))
+// handleIngressUpdate is called when an Ingress resource is updated.
+// Implement logic to handle Ingress resource updates.
+func (iw *IngressWatcher) handleIngressUpdate(oldObj, newObj interface{}) {
+	ing, ok := newObj.(*networkingv1.Ingress)
+	if !ok {
+		glog.Error("Expected Ingress in handleIngressUpdate")
 		return
 	}
 
-	// Start a separate goroutine to run the daily check for Ingress resources
-	go iw.checkIngressesDaily(stopCh)
+	// TODO: Implement your logic for handling Ingress updates
 }
 
-// handleIngressUpdate processes updates to Ingress resources.
-func (iw *IngressWatcher) handleIngressUpdate(ing *networkingv1.Ingress) {
-	// Handle Ingress resource update logic
-}
-
-// checkIngressesDaily checks Ingress resources with the specified label once a day.
-func (iw *IngressWatcher) checkIngressesDaily(stopCh <-chan struct{}) {
-	ticker := time.NewTicker(24 * time.Hour)
-
-	for {
-		select {
-		case <-stopCh:
-			ticker.Stop()
-			return
-		case <-ticker.C:
-			// Perform the daily check for Ingress resources
-			iw.processDailyIngressCheck()
-		}
-	}
-}
-
+// processDailyIngressCheck checks all Ingress resources daily and performs
+// necessary operations if any certificate needs to be renewed.
 func (iw *IngressWatcher) processDailyIngressCheck() {
-	// Retrieve all Ingress resources with the specified label
-	ingressList, err := iw.Client.NetworkingV1().Ingresses("").List(context.TODO(), metav1.ListOptions{
-		LabelSelector: "nimble.opti.adapter/enabled=true",
-	})
-	if err != nil {
-		klog.Errorf("Failed to list Ingress resources: %v", err)
-		return
-	}
-	// for _, ing := range ingressList.Items {
-	// 	// Check for the associated `NimbleOptiAdapter` CRD resource in the same namespace
-	// 	// and retrieve the Secret specified in `spec.tls[].secretName` for each tls[]
+	for {
+		// Sleep for a day before processing
+		time.Sleep(24 * time.Hour)
 
-	// 	// Calculate the time remaining until the certificate expires
+		// List all Ingress resources from the cache
+		ingressList := iw.IngressInformer.GetStore().List()
 
-	// 	// If the certificate expires in equal or fewer days than the `CertificateRenewalThreshold`
-	// 	// specified in the `NimbleOptiAdapter` resource in the same namespace,
-	// 	// initiate the certificate renewal process
-	// 	// If the certificate expires in more days than the `CertificateRenewalThreshold`
-	// 	// specified in the `NimbleOptiAdapter` resource in the same namespace,
-	// 	// check if any path in `spec.rules[].http.paths[].path` contains `.well-known/acme-challenge`
-
-	// 	// If there is a match, initiate the certificate renewal process
-	// }
-	for _, ing := range ingressList.Items {
-		nimbleOptiAdapter, err := iw.NimbleOptiAdapterClient.YourApiGroupV1().NimbleOptiAdapters(ing.Namespace).Get(context.TODO(), ing.Name, metav1.GetOptions{})
-		if err != nil {
-			klog.Errorf("Failed to get NimbleOptiAdapter resource: %v", err)
-			continue
-		}
-
-		for _, tls := range ing.Spec.TLS {
-			secret, err := iw.Client.CoreV1().Secrets(ing.Namespace).Get(context.TODO(), tls.SecretName, metav1.GetOptions{})
-			if err != nil {
-				klog.Errorf("Failed to get Secret: %v", err)
+		for _, obj := range ingressList {
+			ing, ok := obj.(*networkingv1.Ingress)
+			if !ok {
+				glog.Error("Expected Ingress in processDailyIngressCheck")
 				continue
 			}
 
-			// Use the secret to calculate the time remaining until the certificate expires
-			// (Assuming the certificate is in the 'tls.crt' data field of the Secret)
-
-			certBytes := secret.Data["tls.crt"]
-			cert, err := x509.ParseCertificate(certBytes)
-			if err != nil {
-				klog.Errorf("Failed to parse certificate: %v", err)
-				continue
-			}
-
-			remainingDays := cert.NotAfter.Sub(time.Now()).Hours() / 24
-
-			if remainingDays <= float64(nimbleOptiAdapter.Spec.CertificateRenewalThreshold) {
-				// Initiate the certificate renewal process
-			} else {
-				// Check if any path in `spec.rules[].http.paths[].path` contains `.well-known/acme-challenge`
-				for _, rule := range ing.Spec.Rules {
-					for _, path := range rule.HTTP.Paths {
-						if strings.Contains(path.Path, ".well-known/acme-challenge") {
-							// Initiate the certificate renewal process
-						}
-					}
-				}
-			}
+			// TODO: Here you should check the annotations or TLS sections
+			// of the Ingress resource and decide whether a certificate needs
+			// to be renewed or not. If a certificate needs to be renewed,
+			// you can call a function to perform the renewal operation.
+			// Note: This function should be implemented by you.
 		}
 	}
 }
