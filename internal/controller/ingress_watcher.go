@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	nimbleoptiadapterclientset "github.com/uri-tech/nimble-opti-adapter/pkg/generated/clientset/versioned"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/informers"

@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// api/v1/nimbleoptiadapter_types.go
+
 package v1
 
 import (
