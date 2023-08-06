@@ -14,8 +14,6 @@ initialize.md
 bin
 testbin/*
 Dockerfile.cross
-script*
-*.sh
 
 # Test binary, build with `go test -c`
 *.test

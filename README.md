@@ -128,13 +128,14 @@ metadata:
 Create a nimble-opti-adapter custom resource in any namespace:
 
 ```yaml
-apiVersion: nimble-opti-adapter.example.com/v1alpha1
+apiVersion: adapter.uri-tech.github.io/v1
 kind: NimbleOpti
 metadata:
-  name: example-config
+  name: default
 spec:
   certificateRenewalThreshold: 30
   annotationRemovalDelay: 60
+  RenewalCheckInterval: 60
 ```
 
 ## 📊 Metrics

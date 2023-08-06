@@ -177,7 +177,7 @@ func (iw *IngressWatcher) getOrCreateNimbleOpti(ctx context.Context, namespace s
 					Namespace: namespace,
 				},
 				Spec: v1.NimbleOptiSpec{
-					TargetNamespace:             "default",
+					TargetNamespace:             namespace,
 					CertificateRenewalThreshold: 30,
 					AnnotationRemovalDelay:      60,
 					RenewalCheckInterval:        60,
