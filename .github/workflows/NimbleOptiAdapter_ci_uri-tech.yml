@@ -1,0 +1,43 @@
+name: NimbleOptiAdapter_ci_uri-tech
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - "uri-tech"
+    # pull_request:
+    #   branches: [ "main" ]
+    # paths:
+    #   # - "controllers/**"
+    #   # - "Dockerfile"
+    #   # - "main.go"
+    #   - "*"
+    #   # Exclude README.md from triggering the workflow
+    paths-ignore:
+      - "README.md"
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check the repo.
+        uses: actions/checkout@v3
+
+      - name: Login to docker hub registry.
+        run: |
+          docker login docker.io -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+      - name: Build and push "NimbleOpti".
+        run: |
+          IMAGE_TAG=$(date +%s)
+          docker run --rm --privileged tonistiigi/binfmt --install all
+          docker buildx create --use
+          DOCKER_TARGET_PLATFORM="linux/arm64,linux/amd64"
+          DOCKER_USERNAME="nimbleopti"
+          DOCKER_IMAGE_NAME="nimble-opti-adapter"
+          docker buildx build . --platform $DOCKER_TARGET_PLATFORM \
+          --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
+          --build-arg VCS_REF=$(git rev-parse --short HEAD) \
+          --build-arg VERSION=0.1 \
+          --tag $DOCKER_USERNAME/$DOCKER_IMAGE_NAME:$IMAGE_TAG --tag $DOCKER_USERNAME/$DOCKER_IMAGE_NAME:latest  \
+          --file ./Dockerfile \
+          --output type=image,push=true

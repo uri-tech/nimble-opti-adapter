@@ -1,0 +1,34 @@
+---
+# Source: nimble-opti-adapter/templates/deployment.yaml
+# ./helm/nimble-opti-adapter/templates/deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nimble-opti-adapter
+  labels:
+    helm.sh/chart: nimble-opti-adapter-0.1.0
+    app.kubernetes.io/name: nimble-opti-adapter
+    app.kubernetes.io/instance: nimble-opti-adapter
+    app.kubernetes.io/version: "0.1.0"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: nimble-opti-adapter
+      app.kubernetes.io/instance: nimble-opti-adapter
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: nimble-opti-adapter
+        app.kubernetes.io/instance: nimble-opti-adapter
+    spec:
+      containers:
+        - name: nimble-opti-adapter
+          image: "urial1500/nimble-opti-adapter:latest"
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP

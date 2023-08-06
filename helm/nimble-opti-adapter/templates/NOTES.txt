@@ -17,7 +17,7 @@ Your {{ .Chart.Name }} operator is up and running. Here are some important infor
    Save the following YAML content to a file named `nimble-opti-adapterconfig.yaml`:
 
    apiVersion: nimble-opti-adapter.example.com/v1alpha1
-   kind: nimble-opti-adapterConfig
+   kind: NimbleOptiConfig
    metadata:
      name: example-config
    spec:

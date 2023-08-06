@@ -1,0 +1,8 @@
+apiVersion: example.com/v1
+kind: NimbleOpti
+metadata:
+  name: example-config
+spec:
+  certificateRenewalThreshold:
+    { { .Values.nimbleOpti.certificateRenewalThreshold } }
+  annotationRemovalDelay: { { .Values.nimbleOpti.annotationRemovalDelay } }

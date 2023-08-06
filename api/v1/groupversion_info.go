@@ -14,9 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1 contains API Schema definitions for the nimbleoptiadapter v1 API group
+// Package v1 contains API Schema definitions for the adapter v1 API group
 // +kubebuilder:object:generate=true
-// +groupName=nimbleoptiadapter.nimble-opti-adapter.example.com
+// +groupName=adapter.uri-tech.github.io
 package v1
 
 import (
@@ -26,7 +26,7 @@ import (
 
 var (
 	// GroupVersion is group version used to register these objects
-	GroupVersion = schema.GroupVersion{Group: "nimbleoptiadapter.nimble-opti-adapter.example.com", Version: "v1"}
+	GroupVersion = schema.GroupVersion{Group: "adapter.uri-tech.github.io", Version: "v1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: GroupVersion}

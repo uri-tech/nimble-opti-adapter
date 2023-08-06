@@ -12,6 +12,8 @@ This Helm chart deploys the nimble-opti-adapter, a Kubernetes operator that auto
 To install the chart with the release name `nimble-opti-adapter`:
 
 ```bash
+git clone https://github.com/uri-tech/nimble-opti-adapter.git
+cd ./nimble-opti-adapter
 helm install nimble-opti-adapter ./helm/nimble-opti-adapter
 ```
 
@@ -44,7 +46,7 @@ metadata:
 
 ```yaml
 apiVersion: nimble-opti-adapter.example.com/v1alpha1
-kind: nimble-opti-adapterConfig
+kind: NimbleOptiConfig
 metadata:
   name: example-config
 spec:
@@ -54,7 +56,7 @@ spec:
 
 ## Upgrading
 
-To upgrade the nimble-opti-adapter Helm chart:=:
+To upgrade the nimble-opti-adapter Helm chart:
 
 ```bash
 helm upgrade nimble-opti-adapter ./helm/nimble-opti-adapter

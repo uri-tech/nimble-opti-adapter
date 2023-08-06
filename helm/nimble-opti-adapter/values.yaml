@@ -19,3 +19,7 @@ serviceAccount:
 podAnnotations: {}
 
 resources: {}
+
+nimbleOpti:
+  certificateRenewalThreshold: 30
+  annotationRemovalDelay: 60

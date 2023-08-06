@@ -14,9 +14,6 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-
-// internal/controller/suite_test.go
-
 package controller
 
 import (
@@ -33,7 +30,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	nimbleoptiadapterv1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
+	adapterv1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -44,7 +41,7 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 
-func TestAPIs(t *testing.T) {
+func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 
 	RunSpecs(t, "Controller Suite")
@@ -65,7 +62,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = nimbleoptiadapterv1.AddToScheme(scheme.Scheme)
+	err = adapterv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	//+kubebuilder:scaffold:scheme

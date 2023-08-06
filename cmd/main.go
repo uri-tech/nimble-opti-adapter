@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// cmd/main.go
+// ./cmd/main.go
 
 package main
 
@@ -22,8 +22,12 @@ import (
 	"flag"
 	"os"
 
+	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
+	// to ensure that exec-entrypoint and run can make use of them.
+
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/klog/v2"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -32,28 +36,30 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	//
-
-	nimbleoptiadapterv1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
+	adapterv1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
 	"github.com/uri-tech/nimble-opti-adapter/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 
-// scheme is used to create a new runtime.Scheme.
 var (
 	scheme   = runtime.NewScheme()
 	setupLog = ctrl.Log.WithName("setup")
 )
 
-// init is used to add the clientgoscheme and nimbleoptiadapterv1 to the scheme.
 func init() {
+	// debug
+	klog.InfoS("debug - init")
+
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(nimbleoptiadapterv1.AddToScheme(scheme))
+	utilruntime.Must(adapterv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
 func main() {
+	// debug
+	klog.InfoS("debug - main")
+
 	// Define command-line flags.
 	var metricsAddr string
 	var enableLeaderElection bool
@@ -72,14 +78,25 @@ func main() {
 	// Set the logger for the controller-runtime package.
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	// Create a new manager.
+	// Create a new manager to provide shared dependencies and start components.
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
-		LeaderElectionID:       "8f24f142.nimble-opti-adapter.example.com",
+		LeaderElectionID:       "8f24f142.uri-tech.github.io",
+		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
+		// when the Manager ends. This requires the binary to immediately end when the
+		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
+		// speeds up voluntary leader transitions as the new leader don't have to wait
+		// LeaseDuration time first.
+		//
+		// In the default scaffold provided, the program ends immediately after
+		// the manager stops, so would be fine to enable this option. However,
+		// if you are doing or is intended to do any operation such as perform cleanups
+		// after the manager stops then its usage might be unsafe.
+		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -87,21 +104,20 @@ func main() {
 	}
 
 	// Initialize the Kubernetes client.
-	kubernetesClient := kubernetes.NewForConfigOrDie(mgr.GetConfig())
+	stopCh := make(chan struct{})
+	defer close(stopCh) // Close this channel when main() returns
 
-	// Initialize the IngressWatcher.
-	ingressWatcher := &controller.IngressWatcher{
-		Client: kubernetesClient,
-	}
+	kubernetesClient := kubernetes.NewForConfigOrDie(mgr.GetConfig())
+	ingressWatcher := controller.NewIngressWatcher(kubernetesClient, stopCh)
 
 	// Pass the KubernetesClient and IngressWatcher to the NimbleOptiAdapterReconciler.
-	if err = (&controller.NimbleOptiAdapterReconciler{
+	if err = (&controller.NimbleOptiReconciler{
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),
 		KubernetesClient: kubernetesClient,
 		IngressWatcher:   ingressWatcher,
 	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "NimbleOptiAdapter")
+		setupLog.Error(err, "unable to create controller", "controller", "NimbleOpti")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

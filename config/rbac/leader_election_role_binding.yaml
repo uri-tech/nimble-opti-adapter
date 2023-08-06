@@ -5,8 +5,8 @@ metadata:
     app.kubernetes.io/name: rolebinding
     app.kubernetes.io/instance: leader-election-rolebinding
     app.kubernetes.io/component: rbac
-    app.kubernetes.io/created-by: bbb
-    app.kubernetes.io/part-of: bbb
+    app.kubernetes.io/created-by: nimble-opti-adapter
+    app.kubernetes.io/part-of: nimble-opti-adapter
     app.kubernetes.io/managed-by: kustomize
   name: leader-election-rolebinding
 roleRef:

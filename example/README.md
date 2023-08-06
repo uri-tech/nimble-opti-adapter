@@ -8,7 +8,7 @@
 
 ### Step 1: Create cluster with Minikube
 
-Start Minikube as non-root with the following command:
+Start Minikube as <b>non-root</b> with the following command:
 
 ```bash
 minikube start
@@ -49,7 +49,6 @@ Be sure never to embed cert-manager as a sub-chart of other Helm charts; cert-ma
 This repository is the only supported source of cert-manager charts. There are some other mirrors and copies across the internet, but those are entirely unofficial and could present a security risk.
 
 Notably, the "Helm stable repository" version of cert-manager is deprecated and should not be used.
-
 
 ```bash
 helm repo add jetstack https://charts.jetstack.io
@@ -147,7 +146,7 @@ Create a `nimble-opti-adapter.yaml` file with the following content:
 
 ```ymal
 apiVersion: nimble-opti-adapter.example.com/v1alpha1
-kind: nimble-opti-adapterConfig
+kind: NimbleOptiConfig
 metadata:
   name: example-config
 spec:

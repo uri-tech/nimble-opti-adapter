@@ -1,0 +1,39 @@
+# permissions for end users to view nimbleoptis.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: nimbleopti-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: nimble-opti-adapter
+    app.kubernetes.io/part-of: nimble-opti-adapter
+    app.kubernetes.io/managed-by: kustomize
+  name: nimbleopti-viewer-role
+rules:
+  - apiGroups:
+      - adapter.uri-tech.github.io
+    resources:
+      - nimbleoptis
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - adapter.uri-tech.github.io
+    resources:
+      - nimbleoptis/status
+    verbs:
+      - get
+  # - apiGroups:
+  #     - networking.k8s.io
+  #   resources:
+  #     - ingresses
+  #   verbs:
+  #     - get
+  #     - list
+  #     - watch
+  #     - create
+  #     - delete
+  #     - patch
+  #     - update
