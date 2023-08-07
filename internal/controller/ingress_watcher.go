@@ -6,7 +6,6 @@ import (
 	"context"
 	"reflect"
 	"strings"
-	"sync"
 	"time"
 
 	v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
@@ -31,7 +30,7 @@ type IngressWatcher struct {
 	Client          kubernetes.Interface
 	IngressInformer cache.SharedIndexInformer
 	ClientObj       client.Client
-	auditMutex      sync.Mutex
+	auditMutex      *NamedMutex
 }
 
 // StartAudit audits daily all Ingress resources with the label "nimble.opti.adapter/enabled=true" in the cluster
@@ -43,7 +42,7 @@ func (iw *IngressWatcher) StartAudit(stopCh <-chan struct{}) {
 		for {
 			select {
 			case <-ticker.C:
-				iw.auditIngressResources(context.TODO())
+				_ = iw.auditIngressResources(context.TODO())
 			case <-stopCh:
 				return
 			}
@@ -75,7 +74,7 @@ func NewIngressWatcher(clientKube kubernetes.Interface, stopCh <-chan struct{}) 
 	iw := &IngressWatcher{
 		Client:     clientKube,
 		ClientObj:  cl,
-		auditMutex: sync.Mutex{},
+		auditMutex: NewNamedMutex(),
 	}
 
 	informerFactory := informers.NewSharedInformerFactory(clientKube, 0)
@@ -258,33 +257,7 @@ func hasIngressChanged(ctx context.Context, oldIng *networkingv1.Ingress, newIng
 	return false
 }
 
-// StartDailyAudit starts a daily audit of all Ingress resources.
-func (iw *IngressWatcher) StartDailyAudit(ctx context.Context) {
-	// debug
-	klog.InfoS("debug - StartDailyAudit")
-
-	ticker := time.NewTicker(24 * time.Hour)
-	go func() {
-		for range ticker.C {
-			iw.AuditIngressResources(ctx)
-		}
-	}()
-}
-
-// AuditIngressResources performs an audit of all Ingress resources.
-func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) {
-	// debug
-	klog.InfoS("debug - AuditIngressResources")
-
-	// TODO: Fetch all Ingresses and v1.NimbleOpti CRDs from the cache.
-	// For each pair, check if the certificate is due to expire and renew if needed.
-
-	// Note: The actual process of fetching resources from the cache and checking
-	// the certificates' expiry dates will depend on your specific use case and tools.
-	// Make sure to replace the placeholder code with your own implementation.
-}
-
-// StartCertificateRenewal starts the certificate renewal process.
+// StartCertificateRenewal get ingress that has "".well-known/acme-challenge" and resolve it.
 func (iw *IngressWatcher) StartCertificateRenewal(ctx context.Context, ing *networkingv1.Ingress) {
 	// debug
 	klog.InfoS("debug - StartCertificateRenewal")
@@ -405,20 +378,31 @@ func (iw *IngressWatcher) startCertificateRenewal(ctx context.Context, ing *netw
 	// TODO: Implement this, e.g., using Prometheus metrics.
 }
 
-// removeHTTPSAnnotation removes the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation from an Ingress.
-func (iw *IngressWatcher) auditIngressResources(ctx context.Context) {
+// auditIngressResources audits all Ingress with the label "nimble.opti.adapter/enabled:true".
+func (iw *IngressWatcher) auditIngressResources(ctx context.Context) error {
+	// debug
+	klog.InfoS("debug - auditIngressResources")
+
 	// Fetch all Ingress resources
 	ingresses := &networkingv1.IngressList{}
 	if err := iw.ClientObj.List(ctx, ingresses); err != nil {
 		klog.Errorf("Failed to list ingresses: %v", err)
-		return
+		return err
 	}
 
 	for _, ing := range ingresses.Items {
-		klog.InfoS("debug - auditIngressResources", "ing", ing)
-		iw.auditMutex.TryLock()
-		// Perform audit logic here
-		// For example, log details, check for certain conditions, etc.
-		iw.auditMutex.Unlock()
+		// check if the ingress is labeled with the label "nimble.opti.adapter/enabled:true"
+		if isAdapterEnabled(ctx, &ing) {
+			// try to lock the namespace
+			if iw.auditMutex.TryLock(ing.Namespace) {
+				// process the ingress
+				iw.processIngressForAdapter(ctx, &ing)
+				// unlock the namespace
+				iw.auditMutex.Unlock(ing.Namespace)
+			} else {
+				klog.Infof("Failed to acquire lock for namespace: %s", ing.Namespace)
+			}
+		}
 	}
+	return nil
 }

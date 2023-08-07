@@ -31,6 +31,7 @@ func setupIngressWatcher(client client.Client) *IngressWatcher {
 
 	iw := NewIngressWatcher(fakeClientset, stopCh)
 	iw.ClientObj = client
+	iw.auditMutex = NewNamedMutex()
 	return iw
 }
 
@@ -46,6 +47,64 @@ func generateIngress(name, namespace string, labels map[string]string) *networki
 }
 
 // Section: 2 -
+
+func TestAuditIngressResources(t *testing.T) {
+	// Create a fake client with some Ingress resources.
+	ctx := context.TODO()
+
+	// 1. Setup fake client and resources
+	fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+
+	ingressWithLabel := generateIngress("ingress-with-label", "default", map[string]string{"nimble.opti.adapter/enabled": "true"})
+	ingressWithoutLabel := generateIngress("ingress-without-label", "default", nil)
+
+	// Create the Ingress resources.
+	err := fakeClient.Create(ctx, ingressWithLabel)
+	if err != nil {
+		t.Fatalf("Failed to create ingress with label: %v", err)
+	}
+
+	// Create the Ingress resources.
+	err = fakeClient.Create(ctx, ingressWithoutLabel)
+	if err != nil {
+		t.Fatalf("Failed to create ingress without label: %v", err)
+	}
+
+	// Create the IngressWatcher.
+	iw := setupIngressWatcher(fakeClient)
+
+	// 2. check the lock mechanism
+
+	// Check if the lock is not acquired for the "default" namespace.
+	locked := iw.auditMutex.IsLocked("default")
+	assert.False(t, locked, "Expected the default namespace to not be locked")
+
+	// Check if the lock is acquired for the "default" namespace.
+	iw.auditMutex.Lock("default")
+	locked = iw.auditMutex.IsLocked("default")
+	assert.True(t, locked, "Expected the default namespace to be locked")
+
+	// Check the function TryLock for when the lock is already acquired.
+	if b := iw.auditMutex.TryLock("default"); b {
+		t.Fatalf("Expected the default namespace to be locked")
+	}
+
+	// Check if the lock is not acquired for the "default" namespace.
+	iw.auditMutex.Unlock("default")
+	locked = iw.auditMutex.IsLocked("default")
+	assert.False(t, locked, "Expected the default namespace to not be locked")
+
+	// Check the function TryLock for when the lock is not acquired.
+	if b := iw.auditMutex.TryLock("default"); !b {
+		t.Fatalf("Expected the default namespace to not be locked")
+	}
+
+	// 3. Call the audit function
+
+	iw.auditMutex.Unlock("default")
+	err = iw.auditIngressResources(ctx)
+	assert.Nil(t, err)
+}
 
 func TestHandleIngressAdd(t *testing.T) {
 	fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
@@ -101,6 +160,7 @@ func TestHandleIngressUpdate(t *testing.T) {
 //
 //
 //
+// Section: 3 -
 
 func TestGetOrCreateNimbleOpti(t *testing.T) {
 	fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
