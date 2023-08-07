@@ -14,6 +14,8 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// internal/controller/suite_test.go
+
 package controller
 
 import (
@@ -41,15 +43,21 @@ var cfg *rest.Config
 var k8sClient client.Client
 var testEnv *envtest.Environment
 
+// TestControllers function starts the suite of tests. This is an entry point to run the tests
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 
+	// RunSpecs runs all registered Specs. It's Ginkgo's equivalent to a testing package's Test function.
+	// The description is used when printing out specs, it does not need to be unique
 	RunSpecs(t, "Controller Suite")
 }
 
+// BeforeSuite is a Ginkgo function to execute some setup code before the suite of tests runs
 var _ = BeforeSuite(func() {
+	// Sets the logger to use Zap, which logs to standard output and uses development mode (pretty colored output).
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
 
+	// Bootstraps the test environment
 	By("bootstrapping test environment")
 	testEnv = &envtest.Environment{
 		CRDDirectoryPaths:     []string{filepath.Join("..", "..", "config", "crd", "bases")},
@@ -58,22 +66,26 @@ var _ = BeforeSuite(func() {
 
 	var err error
 	// cfg is defined in this file globally.
+	// Starts the test environment
 	cfg, err = testEnv.Start()
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
+	// Adds the schema of the NimbleOpti custom resource to the Scheme.
+	// The scheme defines the mapping between Golang structs and Kubernetes API Groups, Versions, and Kinds.
 	err = adapterv1.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
-	//+kubebuilder:scaffold:scheme
-
+	// Initialize the client, it's used to interact with the Kubernetes API
 	k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
 	Expect(err).NotTo(HaveOccurred())
 	Expect(k8sClient).NotTo(BeNil())
 
 })
 
+// AfterSuite is a Ginkgo function to execute some cleanup code after the suite of tests has been run
 var _ = AfterSuite(func() {
+	// Tearing down the test environment
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())

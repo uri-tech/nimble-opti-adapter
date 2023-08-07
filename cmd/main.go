@@ -14,8 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// ./cmd/main.go
+// cmd/main.go
 
+// starting one controller (NimbleOptiReconciler), with also a watcher (ingressWatcher) that assists this controller.
 package main
 
 import (
@@ -110,7 +111,10 @@ func main() {
 	kubernetesClient := kubernetes.NewForConfigOrDie(mgr.GetConfig())
 	ingressWatcher := controller.NewIngressWatcher(kubernetesClient, stopCh)
 
-	// Pass the KubernetesClient and IngressWatcher to the NimbleOptiAdapterReconciler.
+	// Start the daily audit
+	ingressWatcher.StartAudit(stopCh)
+
+	// Pass the KubernetesClient and IngressWatcher to the NimbleOptiReconciler.
 	if err = (&controller.NimbleOptiReconciler{
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),

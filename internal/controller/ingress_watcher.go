@@ -4,7 +4,9 @@ package controller
 
 import (
 	"context"
+	"reflect"
 	"strings"
+	"sync"
 	"time"
 
 	v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
@@ -29,6 +31,24 @@ type IngressWatcher struct {
 	Client          kubernetes.Interface
 	IngressInformer cache.SharedIndexInformer
 	ClientObj       client.Client
+	auditMutex      sync.Mutex
+}
+
+// StartAudit audits daily all Ingress resources with the label "nimble.opti.adapter/enabled=true" in the cluster
+func (iw *IngressWatcher) StartAudit(stopCh <-chan struct{}) {
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				iw.auditIngressResources(context.TODO())
+			case <-stopCh:
+				return
+			}
+		}
+	}()
 }
 
 // NewIngressWatcher initializes a new IngressWatcher and starts
@@ -53,8 +73,9 @@ func NewIngressWatcher(clientKube kubernetes.Interface, stopCh <-chan struct{}) 
 	}
 
 	iw := &IngressWatcher{
-		Client:    clientKube,
-		ClientObj: cl,
+		Client:     clientKube,
+		ClientObj:  cl,
+		auditMutex: sync.Mutex{},
 	}
 
 	informerFactory := informers.NewSharedInformerFactory(clientKube, 0)
@@ -108,9 +129,12 @@ func (iw *IngressWatcher) handleIngressUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
-	// If the adapter is enabled on the new Ingress and it wasn't on the old one,
-	// or if the Ingress was updated, process it.
-	if isAdapterEnabled(ctx, newIng) && (!isAdapterEnabled(ctx, oldIng) || hasIngressChanged(ctx, oldIng, newIng)) {
+	// If the adapter is enabled on the new Ingress and the Ingress has changed, process it.
+	if isAdapterEnabled(ctx, newIng) && hasIngressChanged(ctx, oldIng, newIng) {
+		// debug
+		klog.Infof("Ingress %s/%s has changed, processing", newIng.Namespace, newIng.Name)
+
+		// Process the new Ingress.
 		iw.processIngressForAdapter(ctx, newIng)
 	}
 }
@@ -164,9 +188,6 @@ func (iw *IngressWatcher) getOrCreateNimbleOpti(ctx context.Context, namespace s
 	}
 
 	if err := iw.ClientObj.Get(ctx, key, nimbleOpti); err != nil {
-		// debug
-		klog.Infof("err: %s", err)
-
 		if errors.IsNotFound(err) {
 			// debug
 			klog.InfoS("debug - create NimbleOpti")
@@ -188,6 +209,8 @@ func (iw *IngressWatcher) getOrCreateNimbleOpti(ctx context.Context, namespace s
 				klog.ErrorS(err, "Failed to create NimbleOpti", "namespace", namespace)
 				return nil, err
 			}
+			// debug
+			klog.InfoS("debug - create NimbleOpti done")
 		} else {
 			klog.ErrorS(err, "Failed to get NimbleOpti", "namespace", namespace)
 			return nil, err
@@ -198,13 +221,41 @@ func (iw *IngressWatcher) getOrCreateNimbleOpti(ctx context.Context, namespace s
 }
 
 // hasIngressChanged checks if the important parts of the Ingress have changed.
-// For now, it just checks if the host has changed. Expand this as needed.
-func hasIngressChanged(ctx context.Context, oldIng, newIng *networkingv1.Ingress) bool {
-	// debug
-	klog.InfoS("debug - hasIngressChanged")
+func hasIngressChanged(ctx context.Context, oldIng *networkingv1.Ingress, newIng *networkingv1.Ingress) bool {
+	// Check for changes in the spec
+	if !reflect.DeepEqual(oldIng.Spec, newIng.Spec) {
+		klog.InfoS("Ingress spec has changed")
+		return true
+	}
 
-	// TODO: Implement a more sophisticated change detection if needed.
-	return oldIng.Spec.Rules[0].Host != newIng.Spec.Rules[0].Host
+	oldLabelValue, oldLabelExists := oldIng.Labels["nimble.opti.adapter/enabled"]
+	newLabelValue, newLabelExists := newIng.Labels["nimble.opti.adapter/enabled"]
+
+	// Check for changes in the important labels
+	if oldLabelExists != newLabelExists || (oldLabelExists && newLabelExists && oldLabelValue != newLabelValue) {
+		klog.InfoS("Ingress nimble.opti.adapter/enabled label has changed")
+		return true
+	}
+
+	// Check for changes in annotations
+	if !reflect.DeepEqual(oldIng.Annotations, newIng.Annotations) {
+		klog.InfoS("Ingress annotations have changed")
+		return true
+	}
+
+	// Check for changes in the default backend
+	if !reflect.DeepEqual(oldIng.Spec.DefaultBackend, newIng.Spec.DefaultBackend) {
+		klog.InfoS("Ingress default backend has changed")
+		return true
+	}
+
+	// Check for changes in the TLS configurations
+	if !reflect.DeepEqual(oldIng.Spec.TLS, newIng.Spec.TLS) {
+		klog.InfoS("Ingress TLS configuration has changed")
+		return true
+	}
+
+	return false
 }
 
 // StartDailyAudit starts a daily audit of all Ingress resources.
@@ -352,4 +403,22 @@ func (iw *IngressWatcher) startCertificateRenewal(ctx context.Context, ing *netw
 
 	// Increment the certificate renewals counter.
 	// TODO: Implement this, e.g., using Prometheus metrics.
+}
+
+// removeHTTPSAnnotation removes the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation from an Ingress.
+func (iw *IngressWatcher) auditIngressResources(ctx context.Context) {
+	// Fetch all Ingress resources
+	ingresses := &networkingv1.IngressList{}
+	if err := iw.ClientObj.List(ctx, ingresses); err != nil {
+		klog.Errorf("Failed to list ingresses: %v", err)
+		return
+	}
+
+	for _, ing := range ingresses.Items {
+		klog.InfoS("debug - auditIngressResources", "ing", ing)
+		iw.auditMutex.TryLock()
+		// Perform audit logic here
+		// For example, log details, check for certain conditions, etc.
+		iw.auditMutex.Unlock()
+	}
 }
