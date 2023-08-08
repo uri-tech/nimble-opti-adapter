@@ -151,7 +151,8 @@ metadata:
   name: example-config
 spec:
   certificateRenewalThreshold: 30
-  annotationRemovalDelay: 60
+  annotationRemovalDelay: 10
+  
 ```
 
 Apply the configuration:

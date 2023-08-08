@@ -49,10 +49,46 @@ helm install \
     --create-namespace \
     --version $CERT_MANAGER_VERSION \
     --set installCRDs=true \
+    --set defaultIssuerName=letsencrypt-prod \
+    --set defaultIssuerKind=ClusterIssuer \
     --wait
+
+echo "Applying letsencrypt cluster issuer..."
+cat <<EOF | kubectl apply -f -
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    email: smart.apartment.uri@gmail.com
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+EOF
 
 echo "Enabling Minikube ingress..."
 minikube addons enable ingress
+
+# echo "Adding https ingress..."
+# helm install argocd argo/argo-cd \
+#     --namespace argocd \
+#     --create-namespace \
+#     --set controller.replicas=1 \
+#     --set server.config.url=https://argo.localhost.nip.io/ \
+#     --set server.ingress.enabled=true \
+#     --set server.ingress.annotations.acme\\.cert-manager\\.io/http01-edit-in-place=true \
+#     --set server.ingress.annotations.cert-manager\\.io/cluster-issuer=letsencrypt-prod \
+#     --set server.ingress.annotations.kubernetes\\.io/tls-acme=true \
+#     --set server.ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/backend-protocol=HTTPS \
+#     --set server.ingress.annotations.nginx\\.ingress\\.kubernetes\\.io/ssl-passthrough=true \
+#     --set server.ingress.ingressClassName=nginx \
+#     --set server.ingress.https=true \
+#     --wait
 
 echo "Starting Minikube dashboard..."
 minikube dashboard --url &

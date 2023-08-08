@@ -41,10 +41,6 @@ type NimbleOptiSpec struct {
 	// AnnotationRemovalDelay is the delay (in seconds) after removing the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation before re-adding it
 	// +kubebuilder:validation:Minimum=1
 	AnnotationRemovalDelay int `json:"annotationRemovalDelay"`
-
-	// RenewalCheckInterval is the interval (in minutes) for checking certificate renewals
-	// +kubebuilder:validation:Minimum=1
-	RenewalCheckInterval int `json:"renewalCheckInterval"`
 }
 
 // NimbleOptiStatus defines the observed state of NimbleOpti

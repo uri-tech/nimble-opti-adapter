@@ -40,7 +40,9 @@ The operator monitors the creation and modification of both CustomResourceDefini
 
 3. 📆 The operator runs a daily audit of all Ingress resources with the `nimble.opti.adapter/enabled: "true"` label and associated `NimbleOpti` CRD in the same namespace:
    - In the absence of matching resources, no action is taken.
-   - If matches are found, the operator fetches the associated Secret referenced in `spec.tls[].secretName` for each tls[], calculates the remaining time until certificate expiry and checks it against the `CertificateRenewalThreshold` specified in the `NimbleOpti` CRD. If the certificate is due to expire within or on the threshold, certificate renewal is initiated.
+   - If matches are found:
+     - If the ingress manifest the presence of .well-known/acme-challenge within the spec.rules[].http.paths[].path attribute, the operator shall initiate the certificate renewal process.
+     - The operator fetches the associated Secret referenced in `spec.tls[].secretName` for each tls[], calculates the remaining time until certificate expiry and checks it against the `CertificateRenewalThreshold` specified in the `NimbleOpti` CRD. If the certificate is due to expire within or on the threshold, certificate renewal is initiated.
 
 4. 🔄 The certificate renewal process involves the following steps:
    - The `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation is temporarily stripped from the Ingress resource.
@@ -134,8 +136,7 @@ metadata:
   name: default
 spec:
   certificateRenewalThreshold: 30
-  annotationRemovalDelay: 60
-  RenewalCheckInterval: 60
+  annotationRemovalDelay: 10
 ```
 
 ## 📊 Metrics

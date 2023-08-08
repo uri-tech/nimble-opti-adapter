@@ -109,7 +109,11 @@ func main() {
 	defer close(stopCh) // Close this channel when main() returns
 
 	kubernetesClient := kubernetes.NewForConfigOrDie(mgr.GetConfig())
-	ingressWatcher := controller.NewIngressWatcher(kubernetesClient, stopCh)
+	ingressWatcher, err := controller.NewIngressWatcher(kubernetesClient, stopCh)
+	if err != nil {
+		setupLog.Error(err, "unable to create ingress watcher")
+		os.Exit(1)
+	}
 
 	// Start the daily audit
 	ingressWatcher.StartAudit(stopCh)
