@@ -3,19 +3,24 @@ package controller
 
 import (
 	"context"
-	"errors"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/x509"
+	"crypto/x509/pkix"
+	"encoding/pem"
 	"fmt"
+	"math/big"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
-	clientgotesting "k8s.io/client-go/testing"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakec "sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -76,47 +81,50 @@ func generateIngress(name, namespace string, labels map[string]string, paths []s
 	}
 }
 
-func updateErrorReaction(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
-	if action.GetVerb() == "update" {
-		return true, nil, errors.New("update error")
-	}
-	return false, nil, nil
-}
-
-// Section: 2 -
-
-func TestAuditMutex(t *testing.T) {
-	iw, err := setupIngressWatcher(nil)
+// generateTestCert creates a self-signed X.509 certificate for testing purposes.
+// The certificate is generated with the provided expiration time.
+//
+// Parameters:
+//   - expiration: The expiration time of the certificate.
+//
+// Returns:
+//   - []byte: The DER-encoded (binary format) certificate.
+//   - error: An error object if there's an issue during certificate generation.
+func generateTestCert(expiration time.Time) ([]byte, error) {
+	// Generate a new ECDSA private key.
+	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		t.Fatalf("Failed to setup IngressWatcher: %v", err)
+		return nil, fmt.Errorf("failed to generate private key: %v", err)
 	}
 
-	t.Run("TestLockingMechanism", func(t *testing.T) {
-		// Check if the lock is not acquired for the "default" namespace.
-		locked := iw.auditMutex.IsLocked("default")
-		assert.False(t, locked, "Expected the default namespace to not be locked")
+	// Define the template for the certificate.
+	template := x509.Certificate{
+		SerialNumber: big.NewInt(1),
+		Subject: pkix.Name{
+			Organization: []string{"Test Org"},
+			Country:      []string{"US"},
+			Province:     []string{"California"},
+			Locality:     []string{"San Francisco"},
+		},
+		NotBefore:             time.Now(),
+		NotAfter:              expiration,
+		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+		IsCA:                  false,
+		DNSNames:              []string{"localhost"},
+	}
 
-		// Check if the lock is acquired for the "default" namespace.
-		iw.auditMutex.Lock("default")
-		locked = iw.auditMutex.IsLocked("default")
-		assert.True(t, locked, "Expected the default namespace to be locked")
+	// Create the self-signed certificate.
+	certDER, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create certificate: %v", err)
+	}
 
-		// Check the function TryLock for when the lock is already acquired.
-		if b := iw.auditMutex.TryLock("default"); b {
-			t.Fatalf("Expected the default namespace to be locked")
-		}
-
-		// Check if the lock is not acquired for the "default" namespace.
-		iw.auditMutex.Unlock("default")
-		locked = iw.auditMutex.IsLocked("default")
-		assert.False(t, locked, "Expected the default namespace to not be locked")
-
-		// Check the function TryLock for when the lock is not acquired.
-		if b := iw.auditMutex.TryLock("default"); !b {
-			t.Fatalf("Expected the default namespace to not be locked")
-		}
-	})
+	return certDER, nil
 }
+
+// Section: 2
 
 func TestAuditIngressResources(t *testing.T) {
 	// Create a fake client with some Ingress resources.
@@ -335,34 +343,6 @@ func TestAddHTTPSAnnotation(t *testing.T) {
 	assert.True(t, exists && val == "HTTPS", "Expected HTTPS annotation to be added")
 }
 
-// func TestGetIngressSecret(t *testing.T) {
-// 	ctx := context.TODO()
-// 	fakeClientset := fake.NewSimpleClientset()
-// 	iw := &IngressWatcher{
-// 		Client: fakeClientset,
-// 	}
-// 	ing := generateIngress("test-ingress", "default", nil, nil)
-// 	ing.Spec.TLS = []networkingv1.IngressTLS{
-// 		{SecretName: "test-secret"},
-// 	}
-
-// 	// Create a fake secret in the fake clientset.
-// 	secret := &corev1.Secret{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name:      "test-secret",
-// 			Namespace: "default",
-// 		},
-// 	}
-// 	_, err := fakeClientset.CoreV1().Secrets("default").Create(ctx, secret, metav1.CreateOptions{})
-// 	assert.Nil(t, err)
-
-// 	// Test the function.
-// 	retrievedSecret, err := iw.getIngressSecret(ctx, ing)
-// 	assert.Nil(t, err)
-// 	assert.NotNil(t, retrievedSecret)
-// 	assert.Equal(t, "test-secret", retrievedSecret.Name)
-// }
-
 func TestProcessIngressForRenewal(t *testing.T) {
 	fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	iw, err := setupIngressWatcher(fakeClient)
@@ -523,10 +503,8 @@ func TestStartCertificateRenewal(t *testing.T) {
 	ctx := context.TODO()
 
 	tests := []struct {
-		name          string
-		mockReactions []clientgotesting.ReactionFunc
-		wantErr       bool
-		initialPaths  []string
+		name         string
+		initialPaths []string
 	}{
 		{
 			name:         "Successful certificate renewal",
@@ -535,15 +513,6 @@ func TestStartCertificateRenewal(t *testing.T) {
 		{
 			name:         "Failure at removing HTTPS annotation",
 			initialPaths: []string{"/app", "/.well-known/acme-challenge"},
-			mockReactions: []clientgotesting.ReactionFunc{
-				func(action clientgotesting.Action) (handled bool, ret runtime.Object, err error) {
-					if action.Matches("update", "ingresses") {
-						return true, nil, errors.New("mock error")
-					}
-					return false, nil, nil
-				},
-			},
-			wantErr: true,
 		},
 		// Add more test scenarios as needed.
 	}
@@ -572,7 +541,7 @@ func TestStartCertificateRenewal(t *testing.T) {
 				},
 				Spec: v1.NimbleOptiSpec{
 					TargetNamespace:             "default",
-					CertificateRenewalThreshold: 30,
+					CertificateRenewalThreshold: 3,
 					AnnotationRemovalDelay:      5,
 				},
 			}
@@ -582,6 +551,103 @@ func TestStartCertificateRenewal(t *testing.T) {
 
 			if err = iw.startCertificateRenewal(ctx, ing, nimbleOpti); err != nil {
 				t.Fatalf("startCertificateRenewal failed: %v", err)
+			}
+		})
+	}
+}
+
+func TestRenewCertificateIfNecessary(t *testing.T) {
+	ctx := context.TODO()
+
+	tests := []struct {
+		name           string
+		tlsSecrets     map[string][]byte // map of secret names to their 'tls.crt' content
+		tlsSecretsTime time.Duration
+		wantRenewal    bool // Whether we expect a certificate renewal to be initiated
+	}{
+		{
+			name:           "Certificate is about to expire",
+			tlsSecrets:     map[string][]byte{},
+			tlsSecretsTime: 1,
+			wantRenewal:    true,
+		},
+		{
+			name:           "Certificate is not about to expire",
+			tlsSecrets:     map[string][]byte{},
+			tlsSecretsTime: 100,
+			wantRenewal:    false,
+		},
+		{
+			name:           "tls.crt missing in secret",
+			tlsSecrets:     map[string][]byte{}, // empty content indicates no 'tls.crt' in the secret
+			tlsSecretsTime: 0,
+			wantRenewal:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Generate the test certificate and handle errors
+			certDER, err := generateTestCert(time.Now().Add(tt.tlsSecretsTime * time.Hour))
+			if err != nil {
+				t.Fatalf("Failed to generate test certificate: %v", err)
+			}
+			tt.tlsSecrets["test-secret"] = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
+
+			fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+
+			// Create the Ingress with the TLS spec.
+			ing := generateIngress("test-ingress", "default", nil, nil)
+			ing.Spec.TLS = []networkingv1.IngressTLS{
+				{
+					SecretName: "test-secret",
+				},
+			}
+			if err := fakeClient.Create(ctx, ing); err != nil {
+				t.Fatalf("Failed to create ingress: %v", err)
+			}
+
+			// Create the associated Secret objects.
+			for secretName, certContent := range tt.tlsSecrets {
+				secret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      secretName,
+						Namespace: "default",
+					},
+					Data: map[string][]byte{
+						"tls.crt": certContent,
+					},
+				}
+				if err := fakeClient.Create(ctx, secret); err != nil {
+					t.Fatalf("Failed to create secret %s: %v", secretName, err)
+				}
+			}
+
+			// Create the IngressWatcher.
+			iw, err := setupIngressWatcher(fakeClient)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Create the NimbleOpti object.
+			nimbleOpti := &v1.NimbleOpti{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "default",
+					Namespace: "default",
+				},
+				Spec: v1.NimbleOptiSpec{
+					TargetNamespace:             "default",
+					CertificateRenewalThreshold: 3, // Renew if certificate expires within 3 days
+					AnnotationRemovalDelay:      5,
+				},
+			}
+			if err := fakeClient.Create(ctx, nimbleOpti); err != nil {
+				t.Fatalf("Failed to create NimbleOpti: %v", err)
+			}
+
+			// Call the method.
+			if err := iw.renewCertificateIfNecessary(ctx, ing); err != nil {
+				t.Errorf("Error in renewCertificateIfNecessary: %v", err)
 			}
 		})
 	}

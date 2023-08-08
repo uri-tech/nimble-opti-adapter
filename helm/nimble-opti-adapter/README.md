@@ -29,6 +29,16 @@ The following table lists the configurable parameters of the nimble-opti-adapter
 
 To customize these parameters, edit the `values.yaml` file in the `helm/nimble-opti-adapter` directory.
 
+## Prometheus Integration
+
+If you're using the Prometheus Operator, this chart includes a `ServiceMonitor` custom resource that can be enabled to automatically discover the metrics endpoint of the nimble-opti-adapter.
+
+To enable this feature, set `serviceMonitor.enabled` to `true` during installation or upgrade.
+
+```bash
+helm install nimble-opti-adapter ./helm/nimble-opti-adapter --set serviceMonitor.enabled=true
+```
+
 ## Usage
 
 1. Label the namespaces where the operator should manage certificates:

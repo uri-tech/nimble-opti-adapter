@@ -15,6 +15,7 @@ RUN go mod download
 COPY cmd/main.go cmd/main.go
 COPY api/ api/
 COPY internal/controller/ internal/controller/
+COPY metrics/ metrics/
 
 # Build
 # the GOARCH has not a default value to allow the binary be built according to the host where the command
@@ -27,6 +28,18 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o ma
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
 FROM gcr.io/distroless/static:nonroot
 WORKDIR /
+
+# Set runtime labels
+LABEL org.label-schema.build-date=$BUILD_DATE \
+    org.label-schema.name="nimble-opti-adapter" \
+    org.label-schema.description="nimble-opti-adapter is a Kubernetes operator that automates certificate renewal management when using ingress with the annotation $(cert-manager.io/cluster-issuer) for services that require TLS communication." \
+    org.label-schema.url="https://github.com/uri-tech/nimble-opti-adapter" \
+    org.label-schema.vcs-ref=$VCS_REF \
+    org.label-schema.vcs-url="https://github.com/uri-tech/nimble-opti-adapter" \
+    org.label-schema.vendor="uri-tech" \
+    org.label-schema.version=$VERSION \
+    org.label-schema.schema-version="1.0"
+
 COPY --from=builder /workspace/manager .
 USER 65532:65532
 

@@ -1,0 +1,17 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nimble-opti-adapter
+  labels:
+    {{- range $key, $value := .Values.serviceMonitor.labels }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app: nimble-opti-adapter
+  endpoints:
+  - port: metrics
+    interval: {{ .Values.serviceMonitor.interval }}
+{{- end }}

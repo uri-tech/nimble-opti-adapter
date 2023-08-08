@@ -21,65 +21,77 @@ package main
 
 import (
 	"flag"
+	"net/http"
 	"os"
 
-	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
-	// to ensure that exec-entrypoint and run can make use of them.
-
-	"k8s.io/client-go/kubernetes"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"k8s.io/klog/v2"
-
+	// Importing Kubernetes client authentication plugins necessary for
+	// various cloud providers.
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	_ "k8s.io/client-go/plugin/pkg/client/auth"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	adapterv1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
 	"github.com/uri-tech/nimble-opti-adapter/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 
 var (
-	scheme   = runtime.NewScheme()
+	// Define scheme for the runtime object.
+	scheme = runtime.NewScheme()
+
+	// Log setup.
 	setupLog = ctrl.Log.WithName("setup")
+
+	// Variables for CLI options.
+	metricsAddr          string
+	probeAddr            string
+	enableLeaderElection bool
+
+	// Zap logging options.
+	opts = zap.Options{
+		Development: true,
+	}
 )
 
 func init() {
-	// debug
 	klog.InfoS("debug - init")
 
+	// Add schemes for client-go and adapterv1.
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
 	utilruntime.Must(adapterv1.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
+
+	// Parse CLI flags.
+	parseFlags()
 }
 
-func main() {
-	// debug
-	klog.InfoS("debug - main")
-
+// parseFlags sets up and parses command-line flags.
+func parseFlags() {
 	// Define command-line flags.
-	var metricsAddr string
-	var enableLeaderElection bool
-	var probeAddr string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
-	opts := zap.Options{
-		Development: true,
-	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
+
+}
+
+func main() {
+	klog.InfoS("debug - main")
 
 	// Set the logger for the controller-runtime package.
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	// Create a new manager to provide shared dependencies and start components.
+	// Initialize the manager.
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
@@ -87,26 +99,19 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "8f24f142.uri-tech.github.io",
-		// LeaderElectionReleaseOnCancel defines if the leader should step down voluntarily
-		// when the Manager ends. This requires the binary to immediately end when the
-		// Manager is stopped, otherwise, this setting is unsafe. Setting this significantly
-		// speeds up voluntary leader transitions as the new leader don't have to wait
-		// LeaseDuration time first.
-		//
-		// In the default scaffold provided, the program ends immediately after
-		// the manager stops, so would be fine to enable this option. However,
-		// if you are doing or is intended to do any operation such as perform cleanups
-		// after the manager stops then its usage might be unsafe.
-		// LeaderElectionReleaseOnCancel: true,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
+	// Start Prometheus metrics server.
+	http.Handle("/metrics", promhttp.Handler())
+	go http.ListenAndServe(metricsAddr, nil)
+
 	// Initialize the Kubernetes client.
 	stopCh := make(chan struct{})
-	defer close(stopCh) // Close this channel when main() returns
+	defer close(stopCh)
 
 	kubernetesClient := kubernetes.NewForConfigOrDie(mgr.GetConfig())
 	ingressWatcher, err := controller.NewIngressWatcher(kubernetesClient, stopCh)
@@ -115,10 +120,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Start the daily audit
+	// Start the daily audit for the ingress watcher.
 	ingressWatcher.StartAudit(stopCh)
 
-	// Pass the KubernetesClient and IngressWatcher to the NimbleOptiReconciler.
+	// Setup the reconciler with the manager.
 	if err = (&controller.NimbleOptiReconciler{
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),
@@ -130,19 +135,19 @@ func main() {
 	}
 	//+kubebuilder:scaffold:builder
 
-	// Add a health check to the manager.
+	// Add health checks.
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
 
-	// Add a readiness check to the manager.
+	// Add readiness checks.
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
 
-	// Start the manager and listen for the termination signal.
+	// Start the manager and listen for termination signals.
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")

@@ -5,20 +5,27 @@ package controller
 import (
 	"context"
 	"crypto/x509"
+	"encoding/pem"
+	"errors"
 	"reflect"
 	"strings"
 	"time"
 
 	v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
+	metrics "github.com/uri-tech/nimble-opti-adapter/metrics"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+
+	errorsK8S "k8s.io/apimachinery/pkg/api/errors"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -31,36 +38,7 @@ type IngressWatcher struct {
 	IngressInformer cache.SharedIndexInformer
 	ClientObj       client.Client
 	auditMutex      *NamedMutex
-}
-
-// StartAudit audits daily all Ingress resources with the label "nimble.opti.adapter/enabled=true" in the cluster
-func (iw *IngressWatcher) StartAudit(stopCh <-chan struct{}) {
-	// debug
-	klog.InfoS("debug - StartAudit")
-
-	go func() {
-		// debug
-		klog.InfoS("debug - StartAudit - go func")
-
-		// Start immediate audit
-		if err := iw.auditIngressResources(context.TODO()); err != nil {
-			klog.ErrorS(err, "error auditing ingress resources")
-		}
-
-		ticker := time.NewTicker(24 * time.Hour)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ticker.C:
-				if err := iw.auditIngressResources(context.TODO()); err != nil {
-					klog.ErrorS(err, "error auditing ingress resources")
-				}
-			case <-stopCh:
-				return
-			}
-		}
-	}()
+	Queue           workqueue.RateLimitingInterface
 }
 
 // NewIngressWatcher initializes a new IngressWatcher and starts
@@ -77,7 +55,17 @@ func NewIngressWatcher(clientKube kubernetes.Interface, stopCh <-chan struct{}) 
 
 	// Create a new scheme for decoding into.
 	scheme := runtime.NewScheme()
-	_ = v1.AddToScheme(scheme) // assuming `v1` package has `AddToScheme` function
+	// assuming `v1` package has `AddToScheme` function
+	if err := v1.AddToScheme(scheme); err != nil {
+		klog.Fatalf("unable to add v1 scheme %v", err)
+		return nil, err
+	}
+
+	// Add client-go's scheme for core Kubernetes types
+	if err := clientgoscheme.AddToScheme(scheme); err != nil {
+		klog.Fatalf("unable to add client-go scheme %v", err)
+		return nil, err
+	}
 
 	// Create a new client to Kubernetes API.
 	cl, err := client.New(cfg, client.Options{Scheme: scheme})
@@ -90,13 +78,49 @@ func NewIngressWatcher(clientKube kubernetes.Interface, stopCh <-chan struct{}) 
 		Client:     clientKube,
 		ClientObj:  cl,
 		auditMutex: NewNamedMutex(),
+		Queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "IngressQueue"),
 	}
 
+	// Setup informer
 	informerFactory := informers.NewSharedInformerFactory(clientKube, 0)
 	iw.IngressInformer = informerFactory.Networking().V1().Ingresses().Informer()
 	iw.IngressInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc:    iw.handleIngressAdd,
-		UpdateFunc: iw.handleIngressUpdate,
+		AddFunc: func(obj interface{}) {
+			key, err := cache.MetaNamespaceKeyFunc(obj)
+			if err != nil {
+				klog.ErrorS(err, "Failed to get MetaNamespaceKey")
+				return
+			}
+
+			// If the key is already in the queue, skip the processing
+			if iw.Queue.NumRequeues(key) > 0 {
+				// debug
+				klog.InfoS("debug - AddFunc - key is already in the queue, skip the processing")
+				return
+			}
+
+			// Add key to the queue to mark it as being processed
+			iw.Queue.Add(key)
+			iw.handleIngressAdd(obj)
+		},
+		UpdateFunc: func(old, new interface{}) {
+			key, err := cache.MetaNamespaceKeyFunc(new)
+			if err != nil {
+				klog.ErrorS(err, "Failed to get MetaNamespaceKey")
+				return
+			}
+
+			// If the key is already in the queue, skip the processing
+			if iw.Queue.NumRequeues(key) > 0 {
+				// debug
+				klog.InfoS("debug - UpdateFunc - key is already in the queue, skip the processing")
+				return
+			}
+
+			// Add key to the queue to mark it as being processed
+			iw.Queue.Add(key)
+			iw.handleIngressUpdate(old, new)
+		},
 	})
 
 	go iw.IngressInformer.Run(stopCh)
@@ -116,6 +140,13 @@ func (iw *IngressWatcher) handleIngressAdd(obj interface{}) {
 		klog.Error("Expected Ingress in handleIngressAdd")
 	}
 
+	// Get the key from the queue and process it
+	obj, shutdown := iw.Queue.Get()
+	if shutdown {
+		return
+	}
+	defer iw.Queue.Done(obj)
+
 	// If "nimble.opti.adapter/enabled" label is true, process it.
 	if isAdapterEnabled(ctx, ing) {
 		_, err := iw.processIngressForRenewal(ctx, ing)
@@ -128,6 +159,7 @@ func (iw *IngressWatcher) handleIngressAdd(obj interface{}) {
 // handleIngressUpdate is called when an Ingress resource is updated.
 // Implement logic to handle Ingress resource updates.
 func (iw *IngressWatcher) handleIngressUpdate(oldObj, newObj interface{}) {
+
 	// debug
 	klog.InfoS("debug - handleIngressUpdate")
 
@@ -145,6 +177,13 @@ func (iw *IngressWatcher) handleIngressUpdate(oldObj, newObj interface{}) {
 		return
 	}
 
+	// Get the key from the queue and process it
+	obj, shutdown := iw.Queue.Get()
+	if shutdown {
+		return
+	}
+	defer iw.Queue.Done(obj)
+
 	// If the adapter is enabled on the new Ingress and the Ingress has changed, process it.
 	if isAdapterEnabled(ctx, newIng) && hasIngressChanged(ctx, oldIng, newIng) {
 		// debug
@@ -157,6 +196,38 @@ func (iw *IngressWatcher) handleIngressUpdate(oldObj, newObj interface{}) {
 		}
 	}
 }
+
+// StartAudit audits daily all Ingress resources with the label "nimble.opti.adapter/enabled=true" in the cluster
+func (iw *IngressWatcher) StartAudit(stopCh <-chan struct{}) {
+	// debug
+	klog.InfoS("debug - StartAudit")
+
+	go func() {
+		// debug
+		klog.InfoS("debug - StartAudit - go func")
+
+		// Start immediate audit - do not need, the handleIngressAdd will kick in for all ingresses as start up.
+		// if err := iw.auditIngressResources(context.TODO()); err != nil {
+		// 	klog.ErrorS(err, "error auditing ingress resources")
+		// }
+
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				if err := iw.auditIngressResources(context.TODO()); err != nil {
+					klog.ErrorS(err, "error auditing ingress resources")
+				}
+			case <-stopCh:
+				return
+			}
+		}
+	}()
+}
+
+// section 2
 
 // isAdapterEnabled checks if the "nimble.opti.adapter/enabled" label is present and set to "true".
 func isAdapterEnabled(ctx context.Context, ing *networkingv1.Ingress) bool {
@@ -214,17 +285,17 @@ func (iw *IngressWatcher) getOrCreateNimbleOpti(ctx context.Context, namespace s
 	nimbleOpti := &v1.NimbleOpti{}
 	key := types.NamespacedName{
 		Namespace: namespace,
-		Name:      "default",
+		Name:      namespace,
 	}
 
 	if err := iw.ClientObj.Get(ctx, key, nimbleOpti); err != nil {
-		if errors.IsNotFound(err) {
+		if errorsK8S.IsNotFound(err) {
 			// debug
 			klog.InfoS("debug - create NimbleOpti")
 
 			nimbleOpti = &v1.NimbleOpti{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "default",
+					Name:      namespace,
 					Namespace: namespace,
 				},
 				Spec: v1.NimbleOptiSpec{
@@ -319,7 +390,9 @@ func (iw *IngressWatcher) startCertificateRenewal(ctx context.Context, ing *netw
 	}
 
 	// Increment the certificate renewals counter.
-	// TODO: implement incrementing nimble-opti-adapter_certificate_renewals_total  and sent to a Prometheus endpoint.
+	if success {
+		metrics.IncrementCertificateRenewals()
+	}
 
 	return nil
 }
@@ -331,6 +404,10 @@ func (iw *IngressWatcher) removeHTTPSAnnotation(ctx context.Context, ing *networ
 	delete(ing.Annotations, "nginx.ingress.kubernetes.io/backend-protocol")
 
 	// Update the Ingress.
+	// if _, err := iw.Client.NetworkingV1().Ingresses(ing.Namespace).Update(ctx, ing, metav1.UpdateOptions{}); err != nil {
+	// 	klog.Error("Unable to remove HTTPS annotation: ", err)
+	// 	return err
+	// }
 	if err := iw.ClientObj.Update(ctx, ing); err != nil {
 		klog.Error("Unable to remove HTTPS annotation: ", err)
 		return err
@@ -360,8 +437,7 @@ func (iw *IngressWatcher) waitForChallengeAbsence(ctx context.Context, timeout t
 
 			// Get the Ingress
 			ingress := &networkingv1.Ingress{}
-			err := iw.ClientObj.Get(timeoutCtx, client.ObjectKey{Name: ingName, Namespace: ingNamespace}, ingress)
-			if err != nil {
+			if err := iw.ClientObj.Get(timeoutCtx, client.ObjectKey{Name: ingName, Namespace: ingNamespace}, ingress); err != nil {
 				klog.ErrorS(err, "Error fetching ingress")
 				return false, err
 			}
@@ -405,6 +481,10 @@ func (iw *IngressWatcher) addHTTPSAnnotation(ctx context.Context, ing *networkin
 	ing.Annotations["nginx.ingress.kubernetes.io/backend-protocol"] = "HTTPS"
 
 	// Update the Ingress.
+	// if _, err := iw.Client.NetworkingV1().Ingresses(ing.Namespace).Update(ctx, ing, metav1.UpdateOptions{}); err != nil {
+	// 	klog.Error("Unable to add HTTPS annotation: ", err)
+	// 	return err
+	// }
 	if err := iw.ClientObj.Update(ctx, ing); err != nil {
 		klog.Error("Unable to add HTTPS annotation: ", err)
 		return err
@@ -413,51 +493,6 @@ func (iw *IngressWatcher) addHTTPSAnnotation(ctx context.Context, ing *networkin
 	return nil
 }
 
-// // getIngressSecret fetches the Secret referenced in spec.tls[].secretName for a given Ingress.
-// func (iw *IngressWatcher) getIngressSecret(ctx context.Context, ing *networkingv1.Ingress) (*corev1.Secret, error) {
-// 	// debug
-// 	klog.InfoS("debug - getIngressSecret")
-
-// 	// Assuming the first TLS entry is the one to be used
-// 	if len(ing.Spec.TLS) > 0 {
-// 		secretName := ing.Spec.TLS[0].SecretName
-// 		secret, err := iw.Client.CoreV1().Secrets(ing.Namespace).Get(context.Background(), secretName, metav1.GetOptions{})
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		return secret, nil
-// 	}
-// 	return nil, nil
-// }
-
-// // updateIngressWithRetry updates an Ingress with retry on conflict.
-// func (iw *IngressWatcher) updateIngressWithRetry(ctx context.Context, ing *networkingv1.Ingress) error {
-// 	// debug
-// 	klog.InfoS("debug - updateIngressWithRetry")
-
-// 	// Creating a context with a timeout
-// 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-// 	defer cancel()
-
-// 	// Define retry policy
-// 	backoff := wait.Backoff{
-// 		Steps:    5,
-// 		Duration: 500 * time.Millisecond,
-// 		Factor:   1.5,
-// 	}
-
-// 	// Implement the update operation with retry
-// 	err := wait.ExponentialBackoff(backoff, func() (bool, error) {
-// 		_, err := iw.Client.NetworkingV1().Ingresses(ing.Namespace).Update(ctx, ing, metav1.UpdateOptions{})
-// 		if err != nil {
-// 			return false, err
-// 		}
-// 		return true, nil
-// 	})
-
-// 	return err
-// }
-
 // auditIngressResources audits all Ingress with the label "nimble.opti.adapter/enabled:true".
 func (iw *IngressWatcher) auditIngressResources(ctx context.Context) error {
 	// debug
@@ -465,7 +500,10 @@ func (iw *IngressWatcher) auditIngressResources(ctx context.Context) error {
 
 	// Fetch all Ingress resources
 	ingresses := &networkingv1.IngressList{}
-	if err := iw.ClientObj.List(ctx, ingresses); err != nil {
+
+	// Fetch all Ingress resources using the standard Kubernetes client
+	ingresses, err := iw.Client.NetworkingV1().Ingresses("").List(ctx, metav1.ListOptions{})
+	if err != nil {
 		klog.Errorf("Failed to list ingresses: %v", err)
 		return err
 	}
@@ -504,6 +542,9 @@ func (iw *IngressWatcher) auditIngressResources(ctx context.Context) error {
 
 // move on all the secret connected to the ingress and renew the certificate if necessary
 func (iw *IngressWatcher) renewCertificateIfNecessary(ctx context.Context, ing *networkingv1.Ingress) error {
+	// debug
+	klog.InfoS("debug - renewCertificateIfNecessary")
+
 	// Iterate over spec.tls[] to fetch associated secrets
 	for _, tlsSpec := range ing.Spec.TLS {
 		secretName := tlsSpec.SecretName
@@ -513,36 +554,70 @@ func (iw *IngressWatcher) renewCertificateIfNecessary(ctx context.Context, ing *
 		err := iw.ClientObj.Get(ctx, client.ObjectKey{Name: secretName, Namespace: ing.Namespace}, secret)
 		if err != nil {
 			klog.Errorf("Failed to fetch secret %s: %v", secretName, err)
-			continue
+			// continue
+			return err
 		}
 
 		// Extract the certificate from the secret. Assuming it's stored under the key "tls.crt"
-		certBytes, ok := secret.Data["tls.crt"]
+		certData, ok := secret.Data["tls.crt"]
 		if !ok {
 			klog.Errorf("Secret %s does not have tls.crt", secretName)
-			continue
+			return errors.New("missing tls.crt in secret")
 		}
-		cert, err := x509.ParseCertificate(certBytes)
+
+		// Check if the certificate is in PEM or DER format
+		var certDER []byte
+		if strings.Contains(string(certData), "-----BEGIN CERTIFICATE-----") {
+			// debug
+			klog.InfoS("debug - renewCertificateIfNecessary - PEM format")
+
+			// Decode PEM to get the DER-encoded certificate
+			block, _ := pem.Decode(certData)
+			if block == nil || block.Type != "CERTIFICATE" {
+				klog.Errorf("Failed to decode PEM block from secret %s", secretName)
+				return errors.New("failed to decode PEM block")
+			}
+			certDER = block.Bytes
+		} else {
+			// debug
+			klog.InfoS("debug - renewCertificateIfNecessary - DER format")
+
+			// Assume it's DER format
+			certDER = certData
+		}
+
+		cert, err := x509.ParseCertificate(certDER)
 		if err != nil {
 			klog.Errorf("Failed to parse certificate from secret %s: %v", secretName, err)
-			continue
+			return err
 		}
 
 		// Calculate remaining duration until certificate expiry
 		timeRemaining := cert.NotAfter.Sub(time.Now())
 
+		// debug
+		klog.Infof("debug - timeRemaining: %v", timeRemaining)
+
 		// Fetch the associated NimbleOpti CRD
 		adapter := &v1.NimbleOpti{}
-		err = iw.ClientObj.Get(ctx, client.ObjectKey{Name: "default", Namespace: ing.Namespace}, adapter)
+		err = iw.ClientObj.Get(ctx, client.ObjectKey{Name: ing.Namespace, Namespace: ing.Namespace}, adapter)
 		if err != nil {
 			klog.Errorf("Failed to fetch NimbleOpti CRD: %v", err)
-			continue
+			// continue
+			return err
 		}
 
+		// debug
+		klog.Infof("debug - adapter.Spec.CertificateRenewalThreshold: %v", adapter.Spec.CertificateRenewalThreshold)
+		klog.Infof("debug - time.Duration(adapter.Spec.CertificateRenewalThreshold*24)*time.Hour: %s", time.Duration(adapter.Spec.CertificateRenewalThreshold*24)*time.Hour)
+
 		// Check against CertificateRenewalThreshold
-		if timeRemaining <= time.Duration(adapter.Spec.CertificateRenewalThreshold)*time.Hour {
+		if timeRemaining <= time.Duration(adapter.Spec.CertificateRenewalThreshold*24)*time.Hour {
 			klog.Infof("Initiating certificate renewal for secret %s", secretName)
-			iw.startCertificateRenewal(ctx, ing, adapter)
+			if err := iw.startCertificateRenewal(ctx, ing, adapter); err != nil {
+				klog.Errorf("Failed to start certificate renewal: %v", err)
+				continue
+			}
 		}
 	}
 	return nil
