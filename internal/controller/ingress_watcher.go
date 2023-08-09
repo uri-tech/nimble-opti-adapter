@@ -108,23 +108,24 @@ func NewIngressWatcher(clientKube kubernetes.Interface, stopCh <-chan struct{}) 
 			}
 			iw.handleIngressAdd(obj)
 		},
-		UpdateFunc: func(old, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(new)
-			if err != nil {
-				klog.ErrorS(err, "Failed to get MetaNamespaceKey")
-				return
-			}
+		// UpdateFunc when making changes to the same obj could be a problem
+		// UpdateFunc: func(old, new interface{}) {
+		// 	key, err := cache.MetaNamespaceKeyFunc(new)
+		// 	if err != nil {
+		// 		klog.ErrorS(err, "Failed to get MetaNamespaceKey")
+		// 		return
+		// 	}
 
-			// debug
-			klog.Infof("debug - UpdateFunc - key: %s", key)
+		// 	// debug
+		// 	klog.Infof("debug - UpdateFunc - key: %s", key)
 
-			if iw.auditMutex.IsLocked(key) {
-				klog.InfoS("debug - UpdateFunc - key is locked now, skip the processing")
-				// iw.auditMutex.Unlock(key)
-				return
-			}
-			iw.handleIngressUpdate(old, new)
-		},
+		// 	if iw.auditMutex.IsLocked(key) {
+		// 		klog.InfoS("debug - UpdateFunc - key is locked now, skip the processing")
+		// 		// iw.auditMutex.Unlock(key)
+		// 		return
+		// 	}
+		// 	iw.handleIngressUpdate(old, new)
+		// },
 	})
 
 	go iw.IngressInformer.Run(stopCh)

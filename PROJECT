@@ -17,4 +17,8 @@ resources:
   kind: NimbleOpti
   path: github.com/uri-tech/nimble-opti-adapter/api/v1
   version: v1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
 version: "3"

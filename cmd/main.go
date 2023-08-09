@@ -21,90 +21,95 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"net/http"
 	"os"
 
-	// Importing Kubernetes client authentication plugins necessary for
-	// various cloud providers.
-	"k8s.io/apimachinery/pkg/runtime"
-	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
-	"k8s.io/client-go/kubernetes"
-	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	_ "k8s.io/client-go/plugin/pkg/client/auth"
-	"k8s.io/klog/v2"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/healthz"
-	"sigs.k8s.io/controller-runtime/pkg/log/zap"
-
+	cmv1 "github.com/cert-manager/cert-manager/pkg/apis/certmanager/v1"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	adapterv1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
 	"github.com/uri-tech/nimble-opti-adapter/internal/controller"
-	// For Admission Controller
-	// admissionv1 "k8s.io/api/admission/v1"
-	//+kubebuilder:scaffold:imports
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/healthz"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
+// Define global variables.
 var (
-	// Define scheme for the runtime object.
-	scheme = runtime.NewScheme()
-
-	// Log setup.
-	setupLog = ctrl.Log.WithName("setup")
-
-	// Variables for CLI options.
-	metricsAddr          string
-	probeAddr            string
+	// Addresses for metrics and health probes.
+	metricsAddr, probeAddr string
+	// Flag to enable leader election.
 	enableLeaderElection bool
-
-	// Zap logging options.
+	// Configuration options for the zap logger.
 	opts = zap.Options{
 		Development: true,
 	}
+	// Logger for setup processes.
+	setupLog = ctrl.Log.WithName("setup")
 )
 
-// func handleAdmissionReview(w http.ResponseWriter, r *http.Request) {
-// 	var review admissionv1.AdmissionReview
-
-// 	// ... [The logic from the previous handleAdmissionReview function]
-
-// 	// ... write the AdmissionReview to the response ...
-// }
-
+// Initialize command line flags.
 func init() {
-	klog.InfoS("debug - init")
-
-	// Add schemes for client-go and adapterv1.
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-	utilruntime.Must(adapterv1.AddToScheme(scheme))
-	//+kubebuilder:scaffold:scheme
-
-	// Parse CLI flags.
-	parseFlags()
-}
-
-// parseFlags sets up and parses command-line flags.
-func parseFlags() {
-	// Define command-line flags.
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
-	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
-		"Enable leader election for controller manager. "+
-			"Enabling this will ensure there is only one active controller manager.")
+	flag.BoolVar(&enableLeaderElection, "leader-elect", false, "Enable leader election for controller manager.")
 	opts.BindFlags(flag.CommandLine)
-	flag.Parse()
-
 }
 
-func main() {
-	klog.InfoS("debug - main")
+// createCertManagerCertificate creates a Certificate resource for cert-manager.
+// This will lead cert-manager to generate a TLS certificate for the webhook server.
+func createCertManagerCertificate(client client.Client) error {
+	cert := &cmv1.Certificate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "webhook-certificate",
+			Namespace: "nimble-opti-adapter-system",
+		},
+		Spec: cmv1.CertificateSpec{
+			SecretName: "webhook-certificate-secret",
+			// IssuerRef: corev1.ObjectReference{
+			// 	Name:  "selfsigned-issuer-nimble-opti",
+			// 	Kind:  "ClusterIssuer",
+			// 	Group: "cert-manager.io",
+			// 	Namespace: "nimble-opti-adapter-system",
+			// },
+			CommonName: "webhook.noa.svc",
+			DNSNames: []string{
+				"webhook.noa.svc.cluster.local",
+			},
+			// PrivateKey: cmv1.CertificatePrivateKey{
+			// 	Algorithm: cmv1.PrivateKeyAlgorithm("RSA"),
+			// 	Size:      2048,
+			// },
+		},
+	}
 
-	// Set the logger for the controller-runtime package.
+	// Create or update the Certificate resource.
+	if err := client.Create(context.TODO(), cert); err != nil {
+		if !errors.IsAlreadyExists(err) {
+			return err
+		}
+		if err := client.Update(context.TODO(), cert); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Entry point of the program.
+func main() {
+	// Parse command line flags.
+	flag.Parse()
+
+	// Set up the logger.
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	// Initialize the manager.
+	// Initialize the manager with configurations.
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
 		HealthProbeBindAddress: probeAddr,
@@ -116,29 +121,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Start Prometheus metrics server.
+	// // Create the cert-manager Certificate for the webhook.
+	// if err := createCertManagerCertificate(mgr.GetClient()); err != nil {
+	// 	setupLog.Error(err, "unable to create cert-manager certificate")
+	// 	os.Exit(1)
+	// }
+
+	// Set up Prometheus metrics server.
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(metricsAddr, nil)
 
-	// // Start the Admission Webhook server.
-	// http.HandleFunc("/admission-webhook", handleAdmissionReview)
-	// go http.ListenAndServeTLS(":8443", "/path/to/tls.crt", "/path/to/tls.key", nil) // Change the port if needed
-
-	// Initialize the Kubernetes client.
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
+	// Initialize the ingress watcher.
 	kubernetesClient := kubernetes.NewForConfigOrDie(mgr.GetConfig())
-	ingressWatcher, err := controller.NewIngressWatcher(kubernetesClient, stopCh)
+	ingressWatcher, err := controller.NewIngressWatcher(kubernetesClient, make(chan struct{}))
 	if err != nil {
 		setupLog.Error(err, "unable to create ingress watcher")
 		os.Exit(1)
 	}
+	ingressWatcher.StartAudit(make(chan struct{}))
 
-	// Start the daily audit for the ingress watcher.
-	ingressWatcher.StartAudit(stopCh)
-
-	// Setup the reconciler with the manager.
+	// Set up the custom reconciler.
 	if err = (&controller.NimbleOptiReconciler{
 		Client:           mgr.GetClient(),
 		Scheme:           mgr.GetScheme(),
@@ -148,14 +150,18 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "NimbleOpti")
 		os.Exit(1)
 	}
-	//+kubebuilder:scaffold:builder
+
+	// Set up the webhook server.
+	if err = (&adapterv1.NimbleOpti{}).SetupWebhookWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create webhook", "webhook", "NimbleOpti")
+		os.Exit(1)
+	}
 
 	// Add health checks.
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up health check")
 		os.Exit(1)
 	}
-
 	// Add readiness checks.
 	if err := mgr.AddReadyzCheck("readyz", healthz.Ping); err != nil {
 		setupLog.Error(err, "unable to set up ready check")
