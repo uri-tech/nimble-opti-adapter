@@ -19,7 +19,7 @@ package controller
 import (
 	"context"
 
-	networkingv1 "k8s.io/api/networking/v1"
+	// networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
@@ -45,13 +45,6 @@ type NimbleOptiReconciler struct {
 //+kubebuilder:rbac:groups=adapter.uri-tech.github.io,resources=nimbleoptis/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=adapter.uri-tech.github.io,resources=nimbleoptis/finalizers,verbs=update
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the NimbleOpti object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
 func (r *NimbleOptiReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -81,7 +74,7 @@ func (r *NimbleOptiReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	// Owns specifies objects that are owned by the primary resource
 	// The argument here must be a runtime object that will have its
 	// Group, Version, and Kind filled in.
-	b = b.Owns(&networkingv1.Ingress{})
+	// b = b.Owns(&networkingv1.Ingress{})
 
 	// WithEventFilter specifies a Predicate that will be used to filter
 	// events before they are sent to event handlers.

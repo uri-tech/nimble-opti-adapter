@@ -14,9 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+// starting one controller (NimbleOptiReconciler), with also a watcher (ingressWatcher) that assists this controller.
+
 // cmd/main.go
 
-// starting one controller (NimbleOptiReconciler), with also a watcher (ingressWatcher) that assists this controller.
 package main
 
 import (
@@ -39,6 +40,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	adapterv1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
 	"github.com/uri-tech/nimble-opti-adapter/internal/controller"
+	// For Admission Controller
+	// admissionv1 "k8s.io/api/admission/v1"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -59,6 +62,14 @@ var (
 		Development: true,
 	}
 )
+
+// func handleAdmissionReview(w http.ResponseWriter, r *http.Request) {
+// 	var review admissionv1.AdmissionReview
+
+// 	// ... [The logic from the previous handleAdmissionReview function]
+
+// 	// ... write the AdmissionReview to the response ...
+// }
 
 func init() {
 	klog.InfoS("debug - init")
@@ -108,6 +119,10 @@ func main() {
 	// Start Prometheus metrics server.
 	http.Handle("/metrics", promhttp.Handler())
 	go http.ListenAndServe(metricsAddr, nil)
+
+	// // Start the Admission Webhook server.
+	// http.HandleFunc("/admission-webhook", handleAdmissionReview)
+	// go http.ListenAndServeTLS(":8443", "/path/to/tls.crt", "/path/to/tls.key", nil) // Change the port if needed
 
 	// Initialize the Kubernetes client.
 	stopCh := make(chan struct{})

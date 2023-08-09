@@ -207,8 +207,9 @@ func TestHandleIngressUpdate(t *testing.T) {
 
 	// Test: Update an ingress with changes.
 	labels := map[string]string{"nimble.opti.adapter/enabled": "true"}
+	paths := []string{"/app"}
 	oldIngDifferent := generateIngress("changed-ingress", "default", nil, nil)
-	newIngDifferent := generateIngress("changed-ingress", "default", labels, nil)
+	newIngDifferent := generateIngress("changed-ingress", "default", labels, paths)
 	iw.handleIngressUpdate(oldIngDifferent, newIngDifferent)
 
 	// Assert: Check the label has been processed.

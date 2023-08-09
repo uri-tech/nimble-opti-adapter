@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"time"
@@ -91,37 +92,37 @@ func NewIngressWatcher(clientKube kubernetes.Interface, stopCh <-chan struct{}) 
 	iw.IngressInformer = informerFactory.Networking().V1().Ingresses().Informer()
 	iw.IngressInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
-			// key, err := cache.MetaNamespaceKeyFunc(obj) // it like ingressKey
+			key, err := cache.MetaNamespaceKeyFunc(obj) // it like ingressKey
 
-			// // debug
-			// klog.Infof("debug - AddFunc - key: %s", key)
+			// debug
+			klog.Infof("debug - AddFunc - key: %s", key)
 
-			// if err != nil {
-			// 	klog.ErrorS(err, "Failed to get MetaNamespaceKey")
-			// 	return
-			// }
-			// if iw.auditMutex.IsLocked(key) {
-			// 	iw.auditMutex.Unlock(key)
-			// 	klog.InfoS("debug - AddFunc - key is not locked now, skip the processing")
-			// 	return
-			// }
+			if err != nil {
+				klog.ErrorS(err, "Failed to get MetaNamespaceKey")
+				return
+			}
+			if iw.auditMutex.IsLocked(key) {
+				klog.InfoS("debug - AddFunc - key is locked, skip the processing")
+				// iw.auditMutex.Unlock(key)
+				return
+			}
 			iw.handleIngressAdd(obj)
 		},
 		UpdateFunc: func(old, new interface{}) {
-			// key, err := cache.MetaNamespaceKeyFunc(new)
-			// if err != nil {
-			// 	klog.ErrorS(err, "Failed to get MetaNamespaceKey")
-			// 	return
-			// }
+			key, err := cache.MetaNamespaceKeyFunc(new)
+			if err != nil {
+				klog.ErrorS(err, "Failed to get MetaNamespaceKey")
+				return
+			}
 
-			// // debug
-			// klog.Infof("debug - UpdateFunc - key: %s", key)
+			// debug
+			klog.Infof("debug - UpdateFunc - key: %s", key)
 
-			// if iw.auditMutex.IsLocked(key) {
-			// 	iw.auditMutex.Unlock(key)
-			// 	klog.InfoS("debug - UpdateFunc - key is not locked now, skip the processing")
-			// 	return
-			// }
+			if iw.auditMutex.IsLocked(key) {
+				klog.InfoS("debug - UpdateFunc - key is locked now, skip the processing")
+				// iw.auditMutex.Unlock(key)
+				return
+			}
 			iw.handleIngressUpdate(old, new)
 		},
 	})
@@ -198,25 +199,25 @@ func (iw *IngressWatcher) removeHTTPSAnnotation(ctx context.Context, ing *networ
 	// 	return err
 	// }
 
-	// key := ingressKey(ing)
+	key := ingressKey(ing)
 
-	// // debug
-	// klog.Infof("debug - removeHTTPSAnnotation - key: %s", key)
+	// debug
+	klog.Infof("debug - removeHTTPSAnnotation - key: %s", key)
 
-	// if isLock := iw.auditMutex.TryLock(key); isLock {
-	// 	defer iw.auditMutex.Unlock(key)
-	// 	// debug
-	// 	klog.Infof("debug - removeHTTPSAnnotation - key is locked")
+	if isLock := iw.auditMutex.TryLock(key); isLock {
+		defer iw.auditMutex.Unlock(key)
+		// debug
+		klog.Infof("debug - removeHTTPSAnnotation - key is locked")
 
-	if err := iw.ClientObj.Update(ctx, ing); err != nil {
-		klog.Error("Unable to remove HTTPS annotation: ", err)
-		return err
+		if err := iw.ClientObj.Update(ctx, ing); err != nil {
+			klog.Error("Unable to remove HTTPS annotation: ", err)
+			return err
+		}
+	} else {
+		errMassage := fmt.Sprintf("key %s is locked, and should be unlocked", key)
+		klog.Errorf(errMassage)
+		return errors.New(errMassage)
 	}
-	// } else {
-	// 	errMassage := fmt.Sprintf("key %s is locked, and should be unlocked", key)
-	// 	klog.Errorf(errMassage)
-	// 	return errors.New(errMassage)
-	// }
 
 	return nil
 }
@@ -237,24 +238,25 @@ func (iw *IngressWatcher) addHTTPSAnnotation(ctx context.Context, ing *networkin
 	// 	return err
 	// }
 
-	// key := ingressKey(ing)
+	key := ingressKey(ing)
 
-	// // debug
-	// klog.Infof("debug - addHTTPSAnnotation - key: %s", key)
+	// debug
+	klog.Infof("debug - addHTTPSAnnotation - key: %s", key)
 
-	// if isLock := iw.auditMutex.TryLock(key); isLock {
-	// 	// debug
-	// 	klog.Infof("debug - addHTTPSAnnotation - key is locked")
+	if isLock := iw.auditMutex.TryLock(key); isLock {
+		defer iw.auditMutex.Unlock(key)
+		// debug
+		klog.Infof("debug - addHTTPSAnnotation - key is locked")
 
-	if err := iw.ClientObj.Update(ctx, ing); err != nil {
-		klog.Error("Unable to add HTTPS annotation: ", err)
-		return err
+		if err := iw.ClientObj.Update(ctx, ing); err != nil {
+			klog.Error("Unable to add HTTPS annotation: ", err)
+			return err
+		}
+	} else {
+		errMassage := fmt.Sprintf("key %s is locked, and should be unlocked", key)
+		klog.Errorf(errMassage)
+		return errors.New(errMassage)
 	}
-	// } else {
-	// 	errMassage := fmt.Sprintf("key %s is locked, and should be unlocked", key)
-	// 	klog.Errorf(errMassage)
-	// 	return errors.New(errMassage)
-	// }
 
 	return nil
 }
