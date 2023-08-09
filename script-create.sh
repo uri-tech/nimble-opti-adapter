@@ -13,7 +13,8 @@ echo "Deleting Minikube..."
 minikube delete
 
 echo "Starting Minikube..."
-minikube start
+# minikube start
+minikube start --extra-config=apiserver.enable-admission-plugins="MutatingAdmissionWebhook,ValidatingAdmissionWebhook"
 
 echo "Setting Minikube context..."
 kubectl config use-context minikube
@@ -73,9 +74,6 @@ docker push $DOCKER_IMAGE_NAME
 echo "Deploying..."
 make deploy IMG=$DOCKER_IMAGE_NAME
 
-echo "Patching deployment..."
-kubectl patch deployment nimble-opti-adapter-controller-manager -n nimble-opti-adapter-system -p '{"spec":{"template":{"spec":{"containers":[{"name":"kube-rbac-proxy","imagePullPolicy":"Always"},{"name":"manager","imagePullPolicy":"Always"}]}}}}'
-
 # echo "Adding argocd for ingress check..."
 # helm install argocd argo/argo-cd \
 #   --namespace argocd \
@@ -95,6 +93,32 @@ kubectl patch deployment nimble-opti-adapter-controller-manager -n nimble-opti-a
 # echo connecting metrics service...
 # kubectl port-forward svc/nimble-opti-adapter-controller-manager-metrics-service -n nimble-opti-adapter-system 8443:8443
 
+echo "Creating service for metrics..."
+cat <<EOF | kubectl apply -f -
+kind: Service
+apiVersion: v1
+metadata:
+  name: metrics-svc
+  namespace: nimble-opti-adapter-system
+  labels:
+  annotations:
+spec:
+  ports:
+    - name: https
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+  selector:
+    control-plane: controller-manager
+  type: ClusterIP
+EOF
+
+# Sleep for 1 second to allow the dashboard to start
+sleep $SLEEP_TIME
+
+echo "Patching deployment..."
+kubectl patch deployment nimble-opti-adapter-controller-manager -n nimble-opti-adapter-system -p '{"spec":{"template":{"spec":{"containers":[{"name":"kube-rbac-proxy","imagePullPolicy":"Always"},{"name":"manager","imagePullPolicy":"Always"}]}}}}'
+
 echo "Starting Minikube dashboard..."
 # kubectl create serviceaccount kubernetes-dashboard -n kubernetes-dashboard
 # Delete the dashboard
@@ -102,7 +126,7 @@ minikube addons disable dashboard
 minikube addons enable dashboard
 minikube dashboard --url &
 
-# Sleep for 1 second to allow the dashboard to start
-sleep $SLEEP_TIME
+echo "provide you with the URL for the metrics-svc service..."
+minikube service metrics-svc -n nimble-opti-adapter-system --url
 
 echo "Setup complete."

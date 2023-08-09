@@ -99,6 +99,7 @@ EOF
 
 echo "NimbleOpti resource applied successfully."
 
+cat <<EOF | kubectl apply -f -
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
@@ -116,3 +117,23 @@ project: your-gcp-project-id
 serviceAccountSecretRef:
 name: clouddns-dns01-solver-svc-acct
 key: key.json
+EOF
+
+cat <<EOF | kubectl apply -f -
+kind: Service
+apiVersion: v1
+metadata:
+  name: metrics-svc
+  namespace: nimble-opti-adapter-system
+  labels:
+  annotations:
+spec:
+  ports:
+    - name: https
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+  selector:
+    control-plane: controller-manager
+  type: ClusterIP
+EOF

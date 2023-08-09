@@ -1,5 +1,7 @@
+# config/certmanager/kustomization.yaml
+
 resources:
-- certificate.yaml
+  - certificate.yaml
 
 configurations:
-- kustomizeconfig.yaml
+  - kustomizeconfig.yaml

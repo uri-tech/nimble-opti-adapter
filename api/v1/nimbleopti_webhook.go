@@ -20,6 +20,7 @@ package v1
 
 import (
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -30,6 +31,9 @@ import (
 var nimbleoptilog = logf.Log.WithName("nimbleopti-resource")
 
 func (r *NimbleOpti) SetupWebhookWithManager(mgr ctrl.Manager) error {
+	// debug
+	klog.Info("debug - SetupWebhookWithManager")
+
 	return ctrl.NewWebhookManagedBy(mgr).
 		For(r).
 		Complete()
@@ -43,6 +47,9 @@ var _ webhook.Defaulter = &NimbleOpti{}
 
 // Default implements webhook.Defaulter so a webhook will be registered for the type
 func (r *NimbleOpti) Default() {
+	// debug
+	klog.Info("debug - Default")
+
 	nimbleoptilog.Info("default", "name", r.Name)
 
 	// TODO(user): fill in your defaulting logic.
@@ -63,6 +70,9 @@ func (r *NimbleOpti) ValidateCreate() (admission.Warnings, error) {
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for the type
 func (r *NimbleOpti) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
+	// debug
+	klog.Info("debug - ValidateUpdate")
+
 	nimbleoptilog.Info("validate update", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object update.
@@ -71,6 +81,9 @@ func (r *NimbleOpti) ValidateUpdate(old runtime.Object) (admission.Warnings, err
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for the type
 func (r *NimbleOpti) ValidateDelete() (admission.Warnings, error) {
+	// debug
+	klog.Info("debug - ValidateDelete")
+
 	nimbleoptilog.Info("validate delete", "name", r.Name)
 
 	// TODO(user): fill in your validation logic upon object deletion.

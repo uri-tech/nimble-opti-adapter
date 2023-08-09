@@ -452,13 +452,22 @@ func (iw *IngressWatcher) startCertificateRenewal(ctx context.Context, ing *netw
 
 	// Wait for the absence of the ACME challenge path or for the timeout.
 	timeout := time.Duration(adapter.Spec.AnnotationRemovalDelay) * time.Second
-	success, err := iw.waitForChallengeAbsence(ctx, timeout, ing.Namespace, ing.Name)
+	successTime, err := iw.waitForChallengeAbsence(ctx, timeout, ing.Namespace, ing.Name)
 	if err != nil {
 		klog.Errorf("Failed to wait for the absence of ACME challenge path: %v", err)
 		return err
 	}
-	if !success {
+	if successTime > timeout {
 		klog.Warningln("Failed to confirm the absence of ACME challenge path before timeout.")
+	}
+
+	// log the duration (in seconds) of annotation updates during each renewal
+	if successTime == timeout*2 {
+		klog.Infof("Annotation update duration: %v", timeout)
+		metrics.RecordAnnotationUpdateDuration(timeout.Seconds())
+	} else {
+		klog.Infof("Annotation update duration: %v", successTime)
+		metrics.RecordAnnotationUpdateDuration(successTime.Seconds())
 	}
 
 	// Reinstate the annotation.
@@ -468,7 +477,7 @@ func (iw *IngressWatcher) startCertificateRenewal(ctx context.Context, ing *netw
 	}
 
 	// Increment the certificate renewals counter.
-	if success {
+	if successTime <= timeout {
 		metrics.IncrementCertificateRenewals()
 	}
 
@@ -476,10 +485,13 @@ func (iw *IngressWatcher) startCertificateRenewal(ctx context.Context, ing *netw
 }
 
 // waitForChallengeAbsence waits for the absence of the ACME challenge path in the Ingress or until a timeout is reached.
-// Returns false when the timeout has passed or there is an error.
-func (iw *IngressWatcher) waitForChallengeAbsence(ctx context.Context, timeout time.Duration, ingNamespace, ingName string) (bool, error) {
+// Returns the time it took to renew(timeout*2 when it failed) or there is an error.
+func (iw *IngressWatcher) waitForChallengeAbsence(ctx context.Context, timeout time.Duration, ingNamespace, ingName string) (time.Duration, error) {
 	// debug
 	klog.InfoS("Starting waitForChallengeAbsence")
+
+	// Capture the start time
+	startTime := time.Now()
 
 	// Create a child context with the specified timeout
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
@@ -489,7 +501,7 @@ func (iw *IngressWatcher) waitForChallengeAbsence(ctx context.Context, timeout t
 		select {
 		case <-timeoutCtx.Done():
 			klog.InfoS("Timeout reached or context cancelled. Stopping.")
-			return false, nil
+			return timeout * 2, nil
 		default:
 			// debug
 			klog.InfoS("debug - Checking Ingress")
@@ -498,7 +510,8 @@ func (iw *IngressWatcher) waitForChallengeAbsence(ctx context.Context, timeout t
 			ingress := &networkingv1.Ingress{}
 			if err := iw.ClientObj.Get(timeoutCtx, client.ObjectKey{Name: ingName, Namespace: ingNamespace}, ingress); err != nil {
 				klog.ErrorS(err, "Error fetching ingress")
-				return false, err
+				elapsedTime := time.Since(startTime)
+				return elapsedTime, err
 			}
 
 			// Check all paths of the Ingress for the ACME challenge path
@@ -521,7 +534,8 @@ func (iw *IngressWatcher) waitForChallengeAbsence(ctx context.Context, timeout t
 			if !pathFound {
 				// If we reach here, the ACME challenge path was not found in any rule
 				klog.InfoS("ACME challenge path not found. Stopping.")
-				return true, nil
+				elapsedTime := time.Since(startTime)
+				return elapsedTime, nil // Return the elapsed time on success
 			}
 
 			// Introduce a short delay to prevent high CPU usage

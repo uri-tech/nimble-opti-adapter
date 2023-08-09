@@ -456,7 +456,7 @@ func TestWaitForChallengeAbsence(t *testing.T) {
 
 			// Test
 			timeout := 5 * time.Second
-			resultCh := make(chan bool)
+			resultCh := make(chan time.Duration)
 			errorCh := make(chan error)
 			go func() {
 				res, err := iw.waitForChallengeAbsence(ctx, timeout, "default", "test-ingress")
@@ -492,7 +492,12 @@ func TestWaitForChallengeAbsence(t *testing.T) {
 			case err := <-errorCh:
 				t.Fatalf("Error from waitForChallengeAbsence: %v", err)
 			case res := <-resultCh:
-				assert.Equal(t, tt.expectPathAbsence, res)
+				if tt.expectPathAbsence {
+					assert.GreaterOrEqual(t, timeout, res)
+				} else {
+					assert.Less(t, timeout, res)
+				}
+				// assert.(t, tt.expectPathAbsence, res)
 			case <-time.After(timeout + 1*time.Second):
 				t.Fatal("Test timeout exceeded")
 			}

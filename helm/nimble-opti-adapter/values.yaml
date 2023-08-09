@@ -24,8 +24,8 @@ nimbleOpti:
   certificateRenewalThreshold: 30
   annotationRemovalDelay: 10
 
-serviceMonitor:
-  enabled: true
+# serviceMonitor:
+#   enabled: false
 
 prometheus:
   # Whether to create a ServiceMonitor custom resource for Prometheus Operator

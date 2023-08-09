@@ -5,6 +5,8 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"k8s.io/klog/v2"
+	ctrlmetrics "sigs.k8s.io/controller-runtime/pkg/metrics"
 )
 
 var (
@@ -27,9 +29,20 @@ var (
 )
 
 func init() {
+	klog.Info("Metrics init")
 	// Register the metrics.
-	prometheus.MustRegister(CertificateRenewalsTotal)
-	prometheus.MustRegister(AnnotationUpdatesDuration)
+	// prometheus.MustRegister(CertificateRenewalsTotal)
+	// prometheus.MustRegister(AnnotationUpdatesDuration)
+
+	// Register the metrics with controller-runtime's default registry.
+
+	if err := ctrlmetrics.Registry.Register(CertificateRenewalsTotal); err != nil {
+		klog.Errorf("Error registering CertificateRenewalsTotal metric: %v", err)
+	}
+
+	if err := ctrlmetrics.Registry.Register(AnnotationUpdatesDuration); err != nil {
+		klog.Errorf("Error registering AnnotationUpdatesDuration metric: %v", err)
+	}
 }
 
 // IncrementCertificateRenewals increments the certificate renewals counter.
