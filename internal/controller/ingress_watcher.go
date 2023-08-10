@@ -18,6 +18,7 @@ import (
 	networkingv1 "k8s.io/api/networking/v1"
 
 	errorsK8S "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/watch"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,11 +36,29 @@ import (
 // IngressWatcher is a structure that holds the Client for Kubernetes
 // API communication and IngressInformer for caching Ingress resources.
 type IngressWatcher struct {
-	Client          kubernetes.Interface
+	// IngressWatcherClient IngressWatcherInterface
+	// Client               kubernetes.Interface
+	Client          KubernetesClient
 	IngressInformer cache.SharedIndexInformer
 	ClientObj       client.Client
 	auditMutex      *NamedMutex
 	Queue           workqueue.RateLimitingInterface
+}
+
+// KubernetesClient defines methods we're interested in mocking.
+type KubernetesClient interface {
+	Watch(ctx context.Context, namespace, ingressName string) (watch.Interface, error)
+}
+
+// RealKubernetesClient is a structure that holds the Client for Kubernetes.
+type RealKubernetesClient struct {
+	kubernetes.Interface
+}
+
+// Watch implements the KubernetesClient interface.
+func (r *RealKubernetesClient) Watch(ctx context.Context, namespace, ingressName string) (watch.Interface, error) {
+	opts := metav1.SingleObject(metav1.ObjectMeta{Name: ingressName})
+	return r.NetworkingV1().Ingresses(namespace).Watch(ctx, opts)
 }
 
 // common way to do kreate uniq key in Kubernetes - use the namespace and the name of the resource, joined by a delimiter. it's like cache.MetaNamespaceKeyFunc(obj).
@@ -81,7 +100,7 @@ func NewIngressWatcher(clientKube kubernetes.Interface, stopCh <-chan struct{}) 
 	}
 
 	iw := &IngressWatcher{
-		Client:     clientKube,
+		Client:     &RealKubernetesClient{clientKube},
 		ClientObj:  cl,
 		auditMutex: NewNamedMutex(),
 		Queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "IngressQueue"),
@@ -146,7 +165,7 @@ func (iw *IngressWatcher) handleIngressAdd(obj interface{}) {
 	}
 
 	// If "nimble.opti.adapter/enabled" label is true, process it.
-	if isAdapterEnabled(ctx, ing) {
+	if isAdapterEnabledLabel(ctx, ing) && isBackendHttpAnnotations(ctx, ing) {
 		_, err := iw.processIngressForRenewal(ctx, ing)
 		if err != nil {
 			klog.Errorf("error processing ingress. %v", err)
@@ -176,7 +195,7 @@ func (iw *IngressWatcher) handleIngressUpdate(oldObj, newObj interface{}) {
 	}
 
 	// If the adapter is enabled on the new Ingress and the Ingress has changed, process it.
-	if isAdapterEnabled(ctx, newIng) && hasIngressChanged(ctx, oldIng, newIng) {
+	if isAdapterEnabledLabel(ctx, newIng) && hasIngressChanged(ctx, oldIng, newIng) {
 		// debug
 		klog.Infof("Ingress %s/%s has changed, processing", newIng.Namespace, newIng.Name)
 
@@ -194,12 +213,6 @@ func (iw *IngressWatcher) removeHTTPSAnnotation(ctx context.Context, ing *networ
 
 	delete(ing.Annotations, "nginx.ingress.kubernetes.io/backend-protocol")
 
-	// Update the Ingress.
-	// if _, err := iw.Client.NetworkingV1().Ingresses(ing.Namespace).Update(ctx, ing, metav1.UpdateOptions{}); err != nil {
-	// 	klog.Error("Unable to remove HTTPS annotation: ", err)
-	// 	return err
-	// }
-
 	key := ingressKey(ing)
 
 	// debug
@@ -210,6 +223,11 @@ func (iw *IngressWatcher) removeHTTPSAnnotation(ctx context.Context, ing *networ
 		// debug
 		klog.Infof("debug - removeHTTPSAnnotation - key is locked")
 
+		// Update the Ingress.
+		// if _, err := iw.Client.NetworkingV1().Ingresses(ing.Namespace).Update(ctx, ing, metav1.UpdateOptions{}); err != nil {
+		// 	klog.Error("Unable to remove HTTPS annotation: ", err)
+		// 	return err
+		// }
 		if err := iw.ClientObj.Update(ctx, ing); err != nil {
 			klog.Error("Unable to remove HTTPS annotation: ", err)
 			return err
@@ -233,12 +251,6 @@ func (iw *IngressWatcher) addHTTPSAnnotation(ctx context.Context, ing *networkin
 	}
 	ing.Annotations["nginx.ingress.kubernetes.io/backend-protocol"] = "HTTPS"
 
-	// Update the Ingress.
-	// if _, err := iw.Client.NetworkingV1().Ingresses(ing.Namespace).Update(ctx, ing, metav1.UpdateOptions{}); err != nil {
-	// 	klog.Error("Unable to add HTTPS annotation: ", err)
-	// 	return err
-	// }
-
 	key := ingressKey(ing)
 
 	// debug
@@ -249,6 +261,11 @@ func (iw *IngressWatcher) addHTTPSAnnotation(ctx context.Context, ing *networkin
 		// debug
 		klog.Infof("debug - addHTTPSAnnotation - key is locked")
 
+		// Update the Ingress.
+		// if _, err := iw.Client.NetworkingV1().Ingresses(ing.Namespace).Update(ctx, ing, metav1.UpdateOptions{}); err != nil {
+		// 	klog.Error("Unable to add HTTPS annotation: ", err)
+		// 	return err
+		// }
 		if err := iw.ClientObj.Update(ctx, ing); err != nil {
 			klog.Error("Unable to add HTTPS annotation: ", err)
 			return err
@@ -261,11 +278,6 @@ func (iw *IngressWatcher) addHTTPSAnnotation(ctx context.Context, ing *networkin
 
 	return nil
 }
-
-//
-//
-//
-//
 
 // StartAudit audits daily all Ingress resources with the label "nimble.opti.adapter/enabled=true" in the cluster
 func (iw *IngressWatcher) StartAudit(stopCh <-chan struct{}) {
@@ -299,17 +311,27 @@ func (iw *IngressWatcher) StartAudit(stopCh <-chan struct{}) {
 
 // section 2
 
-// isAdapterEnabled checks if the "nimble.opti.adapter/enabled" label is present and set to "true".
-func isAdapterEnabled(ctx context.Context, ing *networkingv1.Ingress) bool {
+// isAdapterEnabledLabel checks if the "nimble.opti.adapter/enabled" label is present and set to "true".
+func isAdapterEnabledLabel(ctx context.Context, ing *networkingv1.Ingress) bool {
 	// debug
-	klog.InfoS("debug - isAdapterEnabled")
+	klog.InfoS("debug - isAdapterEnabledLabel")
 	// klog.Infof("debug %s", ing)
 
 	val, ok := ing.Labels["nimble.opti.adapter/enabled"]
 	return ok && val == "true"
 }
 
-// processIngressForRenewal return true if "".well-known/acme-challenge" was found.
+// isBackendHttpAnnotations checks if the "nginx.ingress.kubernetes.io/backend-protocol" annotation is present and set to "HTTPS".
+func isBackendHttpAnnotations(ctx context.Context, ing *networkingv1.Ingress) bool {
+	// debug
+	klog.InfoS("debug - isBackendHttpAnnotations")
+	// klog.Infof("debug %s", ing)
+
+	val, ok := ing.Labels["nginx.ingress.kubernetes.io/backend-protocol"]
+	return ok && val == "HTTPS"
+}
+
+// processIngressForRenewal return true if it renew the certificate.
 func (iw *IngressWatcher) processIngressForRenewal(ctx context.Context, ing *networkingv1.Ingress) (bool, error) {
 	// debug
 	klog.InfoS("debug  - processIngressForRenewal")
@@ -328,24 +350,42 @@ func (iw *IngressWatcher) processIngressForRenewal(ctx context.Context, ing *net
 	klog.Infof("adapter: %s", adapter)
 
 	// Scan for any path in spec.rules[].http.paths[].path containing .well-known/acme-challenge.
+	if containsAcmeChallenge(ctx, ing) {
+		// Trigger the certificate renewal process.
+		isRenew, err := iw.startCertificateRenewal(ctx, ing, adapter)
+		if err != nil {
+			klog.Errorf("Failed to start certificate renewal: %v", err)
+			return false, err
+		}
+		makeRenewal = isRenew
+	}
+
+	return makeRenewal, nil
+}
+
+// isAcmeChallengePath checks if the given path contains the ACME challenge string.
+func isAcmeChallengePath(ctx context.Context, p string) bool {
+	// debug
+	klog.InfoS("debug - isAcmeChallengePath")
+
+	const acmeChallengePath = ".well-known/acme-challenge"
+	return strings.Contains(p, acmeChallengePath)
+}
+
+// containsAcmeChallenge checks if the given ingress contains any ACME challenge paths.
+func containsAcmeChallenge(ctx context.Context, ing *networkingv1.Ingress) bool {
+	// debug
+	klog.InfoS("debug - containsAcmeChallenge")
+
 	for _, rule := range ing.Spec.Rules {
 		for _, path := range rule.IngressRuleValue.HTTP.Paths {
-			if strings.Contains(path.Path, ".well-known/acme-challenge") {
-				// debug
-				klog.Infof("Found .well-known/acme-challenge in path %s", path.Path)
-				// Trigger the certificate renewal process.
-				if err := iw.startCertificateRenewal(ctx, ing, adapter); err != nil {
-					klog.Errorf("Failed to start certificate renewal: %v", err)
-					return makeRenewal, err
-				}
-
-				// exit the function after the first match
-				return true, nil
-
+			if isAcmeChallengePath(ctx, path.Path) {
+				klog.Infof("Found %s in path %s", ".well-known/acme-challenge", path.Path)
+				return true
 			}
 		}
 	}
-	return makeRenewal, nil
+	return false
 }
 
 // getOrCreateNimbleOpti gets or creates a v1.NimbleOpti CRD in the same namespace as the Ingress.
@@ -440,14 +480,16 @@ func hasIngressChanged(ctx context.Context, oldIng *networkingv1.Ingress, newIng
 }
 
 // startCertificateRenewal get ingress that has "".well-known/acme-challenge" and resolve it.
-func (iw *IngressWatcher) startCertificateRenewal(ctx context.Context, ing *networkingv1.Ingress, adapter *v1.NimbleOpti) error {
+func (iw *IngressWatcher) startCertificateRenewal(ctx context.Context, ing *networkingv1.Ingress, adapter *v1.NimbleOpti) (bool, error) {
 	// debug
 	klog.InfoS("debug - startCertificateRenewal")
+
+	var isRenew = false
 
 	// Remove the annotation.
 	if err := iw.removeHTTPSAnnotation(ctx, ing); err != nil {
 		klog.Errorf("Failed to remove HTTPS annotation: %v", err)
-		return err
+		return false, err
 	}
 
 	// Wait for the absence of the ACME challenge path or for the timeout.
@@ -455,7 +497,7 @@ func (iw *IngressWatcher) startCertificateRenewal(ctx context.Context, ing *netw
 	successTime, err := iw.waitForChallengeAbsence(ctx, timeout, ing.Namespace, ing.Name)
 	if err != nil {
 		klog.Errorf("Failed to wait for the absence of ACME challenge path: %v", err)
-		return err
+		return false, err
 	}
 	if successTime > timeout {
 		klog.Warningln("Failed to confirm the absence of ACME challenge path before timeout.")
@@ -468,12 +510,13 @@ func (iw *IngressWatcher) startCertificateRenewal(ctx context.Context, ing *netw
 	} else {
 		klog.Infof("Annotation update duration: %v", successTime)
 		metrics.RecordAnnotationUpdateDuration(successTime.Seconds())
+		isRenew = true
 	}
 
 	// Reinstate the annotation.
 	if err := iw.addHTTPSAnnotation(ctx, ing); err != nil {
 		klog.Errorf("Failed to add HTTPS annotation: %v", err)
-		return err
+		return isRenew, err
 	}
 
 	// Increment the certificate renewals counter.
@@ -481,7 +524,7 @@ func (iw *IngressWatcher) startCertificateRenewal(ctx context.Context, ing *netw
 		metrics.IncrementCertificateRenewals()
 	}
 
-	return nil
+	return isRenew, nil
 }
 
 // waitForChallengeAbsence waits for the absence of the ACME challenge path in the Ingress or until a timeout is reached.
@@ -553,27 +596,29 @@ func (iw *IngressWatcher) auditIngressResources(ctx context.Context) error {
 	ingresses := &networkingv1.IngressList{}
 
 	// Fetch all Ingress resources using the standard Kubernetes client
-	ingresses, err := iw.Client.NetworkingV1().Ingresses("").List(ctx, metav1.ListOptions{})
+	// ingresses, err := iw.Client.NetworkingV1().Ingresses("").List(ctx, metav1.ListOptions{})
+	err := iw.ClientObj.List(ctx, ingresses, &client.ListOptions{})
 	if err != nil {
 		klog.Errorf("Failed to list ingresses: %v", err)
 		return err
 	}
 
+	// Iterate through all Ingress resources
 	for _, ing := range ingresses.Items {
 		// check if the ingress is labeled with the label "nimble.opti.adapter/enabled:true"
-		if isAdapterEnabled(ctx, &ing) {
+		if isAdapterEnabledLabel(ctx, &ing) && isBackendHttpAnnotations(ctx, &ing) {
 			// process the ingress
-			makeRenewal, err := iw.processIngressForRenewal(ctx, &ing)
+			isRenew, err := iw.processIngressForRenewal(ctx, &ing)
 			if err != nil {
 				klog.Errorf("Failed to process ingress: %v", err)
 				return err
 			}
 
-			if !makeRenewal {
+			if !isRenew {
 				// The operator fetches the associated Secret referenced in `spec.tls[].secretName` for each tls[],
 				//  calculates the remaining time until certificate expiry and checks it against the `CertificateRenewalThreshold` specified in the `NimbleOpti` CRD.
 				// If the certificate is due to expire within or on the threshold, certificate renewal is initiated.
-				if err := iw.renewCertificateIfNecessary(ctx, &ing); err != nil {
+				if err := iw.renewValidCertificateIfNecessary(ctx, &ing); err != nil {
 					klog.Errorf("Error renewing certificate for ingress %s: %v", ing.Name, err)
 					return err
 				}
@@ -584,9 +629,9 @@ func (iw *IngressWatcher) auditIngressResources(ctx context.Context) error {
 }
 
 // move on all the secret connected to the ingress and renew the certificate if necessary
-func (iw *IngressWatcher) renewCertificateIfNecessary(ctx context.Context, ing *networkingv1.Ingress) error {
+func (iw *IngressWatcher) renewValidCertificateIfNecessary(ctx context.Context, ing *networkingv1.Ingress) error {
 	// debug
-	klog.InfoS("debug - renewCertificateIfNecessary")
+	klog.InfoS("debug - renewValidCertificateIfNecessary")
 
 	// Iterate over spec.tls[] to fetch associated secrets
 	for _, tlsSpec := range ing.Spec.TLS {
@@ -612,7 +657,7 @@ func (iw *IngressWatcher) renewCertificateIfNecessary(ctx context.Context, ing *
 		var certDER []byte
 		if strings.Contains(string(certData), "-----BEGIN CERTIFICATE-----") {
 			// debug
-			klog.InfoS("debug - renewCertificateIfNecessary - PEM format")
+			klog.InfoS("debug - renewValidCertificateIfNecessary - PEM format")
 
 			// Decode PEM to get the DER-encoded certificate
 			block, _ := pem.Decode(certData)
@@ -623,7 +668,7 @@ func (iw *IngressWatcher) renewCertificateIfNecessary(ctx context.Context, ing *
 			certDER = block.Bytes
 		} else {
 			// debug
-			klog.InfoS("debug - renewCertificateIfNecessary - DER format")
+			klog.InfoS("debug - renewValidCertificateIfNecessary - DER format")
 
 			// Assume it's DER format
 			certDER = certData
@@ -673,11 +718,79 @@ func (iw *IngressWatcher) renewCertificateIfNecessary(ctx context.Context, ing *
 				return err
 			}
 
-			if err := iw.startCertificateRenewal(ctx, ing, adapter); err != nil {
+			// Wait until ".well-known/acme-challenge" appears in the path of the associate ingress.
+			if err := iw.waitForAcmeChallenge(ctx, ing.Namespace, ing.Name); err != nil {
+				return err
+			}
+
+			// Start certificate renewal
+			_, err := iw.startCertificateRenewal(ctx, ing, adapter)
+			if err != nil {
 				klog.Errorf("Failed to start certificate renewal: %v", err)
 				continue
 			}
 		}
 	}
 	return nil
+}
+
+// waitForAcmeChallenge waits for the ".well-known/acme-challenge" to appear in the specified ingress's paths.
+// It uses a Kubernetes watcher to efficiently detect changes to the ingress resource.
+//
+// Parameters:
+// - ctx: context for cancellation and timeout.
+// - client: Kubernetes clientset to interact with the cluster.
+// - namespace: The namespace where the ingress is located.
+// - ingressName: The name of the ingress resource to watch.
+//
+// Returns:
+// - nil if the acme challenge appears in the ingress paths.
+// - error if the ingress gets deleted, if there's a watcher error, or if the function times out.
+func (iw *IngressWatcher) waitForAcmeChallenge(ctx context.Context, namespace string, ingressName string) error {
+	// debug
+	klog.InfoS("debug - waitForAcmeChallenge")
+
+	// Start watching the specified ingress for changes.
+	// watcher, err := iw.Client.Client.NetworkingV1().Ingresses(namespace).Watch(ctx, metav1.SingleObject(metav1.ObjectMeta{Name: ingressName}))
+	watcher, err := iw.Client.Watch(ctx, namespace, ingressName)
+	if err != nil {
+		return err
+	}
+	defer watcher.Stop()
+
+	// Set a timeout for safety, for example, to exit after 10 minutes if the condition doesn't become true.
+	timeoutCh := time.After(10 * time.Second)
+
+	for {
+		select {
+		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				return fmt.Errorf("watch channel closed")
+			}
+
+			// debug
+			klog.Infof("debug - event.Type: %v", event.Type)
+			klog.Infof("debug - event.Object: %v", event.Object)
+
+			// Handle different types of watch events.
+			switch event.Type {
+			case watch.Added, watch.Modified:
+				// Check if the updated ingress contains the ACME challenge.
+				ing, ok := event.Object.(*networkingv1.Ingress)
+				if ok && containsAcmeChallenge(ctx, ing) {
+					return nil
+				}
+			case watch.Deleted:
+				return fmt.Errorf("ingress deleted before acme challenge appeared")
+			case watch.Error:
+				return fmt.Errorf("error watching ingress")
+			}
+		case <-timeoutCh:
+			// Handle the case where the function times out.
+			return fmt.Errorf("timed out waiting for acme challenge")
+		case <-ctx.Done():
+			// Handle context cancellation or deadline exceed.
+			return ctx.Err()
+		}
+	}
 }

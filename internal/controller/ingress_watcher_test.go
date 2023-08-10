@@ -15,10 +15,12 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
@@ -26,7 +28,61 @@ import (
 	fakec "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
-// Section: help functions
+// FakeKubernetesClient is a structure that holds the fake Client for Kubernetes.
+type FakeKubernetesClient struct {
+	mock.Mock
+}
+
+// Ensure FakeKubernetesClient implements KubernetesClient.
+var _ KubernetesClient = &FakeKubernetesClient{}
+
+// represents a stream of events that the watcher observes
+type FakeWatcher struct {
+	resultCh chan watch.Event
+}
+
+// closes the resultCh channel
+func (f *FakeWatcher) Stop() {
+	close(f.resultCh)
+}
+
+// eturns the resultCh channel for reading.
+// ensuring that outside users of FakeWatcher can only read events from the channel and cannot accidentally send events into it.
+func (f *FakeWatcher) ResultChan() <-chan watch.Event {
+	return f.resultCh
+}
+
+func (m *FakeKubernetesClient) Watch(ctx context.Context, namespace, ingressName string) (watch.Interface, error) {
+	args := m.Called(ctx, namespace, ingressName)
+	return args.Get(0).(watch.Interface), args.Error(1)
+}
+
+// setupIngressWatcher initializes a mock IngressWatcher for testing purposes.
+func setupIngressWatcherMock(clientObj client.Client, client *FakeKubernetesClient) (*IngressWatcher, error) {
+	fakeClientset := fake.NewSimpleClientset()
+	stopCh := make(chan struct{})
+
+	// Add NimbleOpti to the scheme.
+	err := v1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		panic(fmt.Sprintf("Failed to add NimbleOpti to scheme: %v", err))
+	}
+
+	// Create a new IngressWatcher.
+	iw, err := NewIngressWatcher(fakeClientset, stopCh)
+	if err != nil {
+		klog.ErrorS(err, "Failed to create IngressWatcher")
+		return nil, err
+	}
+	// Set the client object.
+	iw.ClientObj = clientObj
+	// Set the audit mutex.
+	iw.auditMutex = NewNamedMutex()
+	// Set the fake Kubernetes client.
+	iw.Client = client
+
+	return iw, nil
+}
 
 // setupIngressWatcher initializes a mock IngressWatcher for testing purposes.
 func setupIngressWatcher(client client.Client) (*IngressWatcher, error) {
@@ -50,9 +106,8 @@ func setupIngressWatcher(client client.Client) (*IngressWatcher, error) {
 	return iw, nil
 }
 
-// generateIngress creates an Ingress object with the given name, namespace, and labels.
-func generateIngress(name, namespace string, labels map[string]string, paths []string) *networkingv1.Ingress {
-	var ingressRules []networkingv1.IngressRule
+func createIngressRules(paths []string) []networkingv1.IngressRule {
+	rulesIn := []networkingv1.IngressRule{}
 
 	for _, path := range paths {
 		rule := networkingv1.IngressRule{
@@ -66,8 +121,15 @@ func generateIngress(name, namespace string, labels map[string]string, paths []s
 				},
 			},
 		}
-		ingressRules = append(ingressRules, rule)
+		rulesIn = append(rulesIn, rule)
 	}
+
+	return rulesIn
+}
+
+// generateIngress creates an Ingress object with the given name, namespace, and labels.
+func generateIngress(name, namespace string, labels map[string]string, paths []string) *networkingv1.Ingress {
+	ingressRules := createIngressRules(paths)
 
 	return &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -176,11 +238,17 @@ func TestHandleIngressAdd(t *testing.T) {
 	val, ok := ing.Labels["nimble.opti.adapter/enabled"]
 	assert.False(t, ok || val == "true", "Did not expect label to be present or set to true")
 
-	// Test: Add an ingress with the nimble.opti.adapter/enabled label set to true.
-	labels := map[string]string{"nimble.opti.adapter/enabled": "true"}
-	ingWithLabel := generateIngress("test-ingress-with-label", "default", labels, nil)
+	// Test: Add an ingress with the nimble.opti.adapter/enabled label set to true and ".well-known/acme-challenge" in it path.
+	labels := map[string]string{
+		"nimble.opti.adapter/enabled":                  "true",
+		"nginx.ingress.kubernetes.io/backend-protocol": "HTTPS",
+	}
+	ingWithLabel := generateIngress("test-ingress-with-label", "default", labels, []string{
+		"/app",
+		"/.well-known/acme-challenge",
+	})
 	iw.handleIngressAdd(ingWithLabel)
-	assert.Equal(t, "true", ingWithLabel.Labels["nimble.opti.adapter/enabled"], "Expected label to be present and set to true")
+
 	// check if the nimbleopti object was created
 	nimbleOpti := &v1.NimbleOpti{}
 	err = iw.ClientObj.Get(context.TODO(), client.ObjectKey{Name: "default", Namespace: "default"}, nimbleOpti)
@@ -221,7 +289,7 @@ func TestHandleIngressUpdate(t *testing.T) {
 	assert.NotNil(t, nimbleOpti)
 }
 
-// Section: 3 -
+// Section: 3
 
 func TestGetOrCreateNimbleOpti(t *testing.T) {
 	fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
@@ -251,18 +319,18 @@ func TestGetOrCreateNimbleOpti(t *testing.T) {
 	// The returned NimbleOpti should have the same UID as the first one, which means it wasn't recreated.
 	assert.Equal(t, nimbleOpti.GetUID(), secondNimbleOpti.GetUID())
 }
-func TestIsAdapterEnabled(t *testing.T) {
+func TestIsAdapterEnabledLabel(t *testing.T) {
 	// Test if the function returns true when the label is present and set to "true".
 	ingWithLabel := generateIngress("test-ingress-with-label", "default", map[string]string{"nimble.opti.adapter/enabled": "true"}, nil)
-	assert.True(t, isAdapterEnabled(context.TODO(), ingWithLabel))
+	assert.True(t, isAdapterEnabledLabel(context.TODO(), ingWithLabel))
 
 	// Test if the function returns false when the label is not present.
 	ingWithoutLabel := generateIngress("test-ingress", "default", nil, nil)
-	assert.False(t, isAdapterEnabled(context.TODO(), ingWithoutLabel))
+	assert.False(t, isAdapterEnabledLabel(context.TODO(), ingWithoutLabel))
 
 	// Test if the function returns false when the label is present but not set to "true".
 	ingWithFalseLabel := generateIngress("test-ingress-with-false-label", "default", map[string]string{"nimble.opti.adapter/enabled": "false"}, nil)
-	assert.False(t, isAdapterEnabled(context.TODO(), ingWithFalseLabel))
+	assert.False(t, isAdapterEnabledLabel(context.TODO(), ingWithFalseLabel))
 }
 
 func TestHasIngressChanged(t *testing.T) {
@@ -345,11 +413,7 @@ func TestAddHTTPSAnnotation(t *testing.T) {
 }
 
 func TestProcessIngressForRenewal(t *testing.T) {
-	fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
-	iw, err := setupIngressWatcher(fakeClient)
-	if err != nil {
-		t.Fatal(err)
-	}
+	ctx := context.TODO()
 
 	tests := []struct {
 		name          string
@@ -360,7 +424,8 @@ func TestProcessIngressForRenewal(t *testing.T) {
 		{
 			name: "Ingress with ACME challenge path should trigger renewal",
 			ingressLabels: map[string]string{
-				"nimble.opti.adapter/enabled": "true",
+				"nimble.opti.adapter/enabled":                  "true",
+				"nginx.ingress.kubernetes.io/backend-protocol": "HTTPS",
 			},
 			ingressPaths: []string{
 				"/app",
@@ -371,7 +436,8 @@ func TestProcessIngressForRenewal(t *testing.T) {
 		{
 			name: "Ingress without ACME challenge path should not trigger renewal",
 			ingressLabels: map[string]string{
-				"nimble.opti.adapter/enabled": "true",
+				"nimble.opti.adapter/enabled":                  "true",
+				"nginx.ingress.kubernetes.io/backend-protocol": "HTTPS",
 			},
 			ingressPaths: []string{
 				"/app",
@@ -382,21 +448,60 @@ func TestProcessIngressForRenewal(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Generate the Ingress object with the specified labels and paths.
+			// Setup
+			fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+			iw, err := setupIngressWatcher(fakeClient)
+			assert.Nil(t, err)
+
+			// Create the initial ingress.
 			ing := generateIngress("test-ingress", "default", tt.ingressLabels, tt.ingressPaths)
+			assert.Nil(t, fakeClient.Create(ctx, ing))
 
-			// Create the Ingress object using the fake client.
-			if err := fakeClient.Create(context.TODO(), ing); err != nil {
-				t.Fatalf("Failed to create Ingress: %v", err)
+			// Test
+			gotRenewalCh := make(chan bool)
+			errorCh := make(chan error)
+			go func() {
+				renewal, err := iw.processIngressForRenewal(ctx, ing)
+				if err != nil {
+					errorCh <- err
+					return
+				}
+				gotRenewalCh <- renewal
+			}()
+
+			if tt.wantRenewal {
+				// debug
+				klog.Infof("Updating ingress to trigger renewal")
+
+				time.Sleep(2 * time.Second)
+				// Update the ingress with the final paths.
+				ing.Spec.Rules = nil
+				for _, path := range []string{"/app"} {
+					ing.Spec.Rules = append(ing.Spec.Rules, networkingv1.IngressRule{
+						IngressRuleValue: networkingv1.IngressRuleValue{
+							HTTP: &networkingv1.HTTPIngressRuleValue{
+								Paths: []networkingv1.HTTPIngressPath{
+									{
+										Path: path,
+									},
+								},
+							},
+						},
+					})
+				}
+				if err := fakeClient.Update(context.TODO(), ing); err != nil {
+					t.Fatalf("Failed to update ingress: %v", err)
+				}
 			}
 
-			gotRenewal, err := iw.processIngressForRenewal(context.TODO(), ing)
-			if err != nil {
-				t.Fatalf("processIngressForRenewal() returned an error: %v", err)
-			}
-
-			if gotRenewal != tt.wantRenewal {
-				t.Fatalf("processIngressForRenewal() = %v; want %v", gotRenewal, tt.wantRenewal)
+			// Wait for a response or timeout after a few seconds.
+			select {
+			case gotRenewal := <-gotRenewalCh:
+				assert.Equal(t, tt.wantRenewal, gotRenewal)
+			case err := <-errorCh:
+				t.Fatalf("Received error: %v", err)
+			case <-time.After(20 * time.Second): // Adjust as needed
+				t.Fatal("Timeout while waiting for processIngressForRenewal response")
 			}
 
 			// Delete the Ingress object.
@@ -469,6 +574,7 @@ func TestWaitForChallengeAbsence(t *testing.T) {
 
 			time.Sleep(2 * time.Second)
 
+			// Update the ingress with the final paths.
 			ing.Spec.Rules = nil
 			for _, path := range tt.finalPaths {
 				ing.Spec.Rules = append(ing.Spec.Rules, networkingv1.IngressRule{
@@ -511,14 +617,17 @@ func TestStartCertificateRenewal(t *testing.T) {
 	tests := []struct {
 		name         string
 		initialPaths []string
+		isRenewed    bool
 	}{
 		{
 			name:         "Successful certificate renewal",
 			initialPaths: []string{"/app"},
+			isRenewed:    true,
 		},
 		{
 			name:         "Failure at removing HTTPS annotation",
 			initialPaths: []string{"/app", "/.well-known/acme-challenge"},
+			isRenewed:    false,
 		},
 		// Add more test scenarios as needed.
 	}
@@ -555,14 +664,17 @@ func TestStartCertificateRenewal(t *testing.T) {
 				t.Fatalf("Failed to create NimbleOpti: %v", err)
 			}
 
-			if err = iw.startCertificateRenewal(ctx, ing, nimbleOpti); err != nil {
+			isRenew, err := iw.startCertificateRenewal(ctx, ing, nimbleOpti)
+			if err != nil {
 				t.Fatalf("startCertificateRenewal failed: %v", err)
 			}
+			assert.Equal(t, isRenew, tt.isRenewed)
+
 		})
 	}
 }
 
-func TestRenewCertificateIfNecessary(t *testing.T) {
+func TestRenewValidCertificateIfNecessary(t *testing.T) {
 	ctx := context.TODO()
 
 	tests := []struct {
@@ -570,24 +682,25 @@ func TestRenewCertificateIfNecessary(t *testing.T) {
 		tlsSecrets     map[string][]byte // map of secret names to their 'tls.crt' content
 		tlsSecretsTime time.Duration
 		wantRenewal    bool // Whether we expect a certificate renewal to be initiated
+		initialPaths   []string
+		middlePaths    []string
+		finalPaths     []string
 	}{
 		{
-			name:           "Certificate is about to expire",
+			name:           "Certificate is valid but about to expire according to threshold",
 			tlsSecrets:     map[string][]byte{},
 			tlsSecretsTime: 1,
 			wantRenewal:    true,
+			initialPaths:   []string{"/app"},
+			middlePaths:    []string{"/app", "/.well-known/acme-challenge"},
+			finalPaths:     []string{"/app"},
 		},
 		{
 			name:           "Certificate is not about to expire",
 			tlsSecrets:     map[string][]byte{},
 			tlsSecretsTime: 100,
 			wantRenewal:    false,
-		},
-		{
-			name:           "tls.crt missing in secret",
-			tlsSecrets:     map[string][]byte{}, // empty content indicates no 'tls.crt' in the secret
-			tlsSecretsTime: 0,
-			wantRenewal:    false,
+			initialPaths:   []string{"/app"},
 		},
 	}
 
@@ -600,17 +713,33 @@ func TestRenewCertificateIfNecessary(t *testing.T) {
 			}
 			tt.tlsSecrets["test-secret"] = pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: certDER})
 
-			fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+			// Create the mock client for ingress watching
+			fakeK8sClient := &FakeKubernetesClient{}
+			// watchChan := make(chan watch.Event)
+			// fakeK8sClient.On("Watch", mock.Anything, mock.Anything, mock.Anything).Return(watchChan, nil)
+			watchChan := make(chan watch.Event)
+			fakeWatcher := &FakeWatcher{
+				resultCh: watchChan,
+			}
+			fakeK8sClient.On("Watch", mock.Anything, mock.Anything, mock.Anything).Return(fakeWatcher, nil)
+
+			// Create the mock client for k8s resources
+			mockClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+
+			// Use fakeK8sClient for IngressWatcher
+			iw, err := setupIngressWatcherMock(mockClient, fakeK8sClient)
+			assert.NoError(t, err)
 
 			// Create the Ingress with the TLS spec.
-			ing := generateIngress("test-ingress", "default", nil, nil)
+			ing := generateIngress("test-ingress", "default", nil, tt.initialPaths)
 			ing.Spec.TLS = []networkingv1.IngressTLS{
 				{
 					SecretName: "test-secret",
 				},
 			}
-			if err := fakeClient.Create(ctx, ing); err != nil {
-				t.Fatalf("Failed to create ingress: %v", err)
+			// Create the Ingress.
+			if err := mockClient.Create(ctx, ing); err != nil {
+				t.Fatalf("Failed to create initial ingress: %v", err)
 			}
 
 			// Create the associated Secret objects.
@@ -624,15 +753,9 @@ func TestRenewCertificateIfNecessary(t *testing.T) {
 						"tls.crt": certContent,
 					},
 				}
-				if err := fakeClient.Create(ctx, secret); err != nil {
+				if err := mockClient.Create(ctx, secret); err != nil {
 					t.Fatalf("Failed to create secret %s: %v", secretName, err)
 				}
-			}
-
-			// Create the IngressWatcher.
-			iw, err := setupIngressWatcher(fakeClient)
-			if err != nil {
-				t.Fatal(err)
 			}
 
 			// Create the NimbleOpti object.
@@ -647,14 +770,262 @@ func TestRenewCertificateIfNecessary(t *testing.T) {
 					AnnotationRemovalDelay:      5,
 				},
 			}
-			if err := fakeClient.Create(ctx, nimbleOpti); err != nil {
+			if err := mockClient.Create(ctx, nimbleOpti); err != nil {
 				t.Fatalf("Failed to create NimbleOpti: %v", err)
 			}
 
-			// Call the method.
-			if err := iw.renewCertificateIfNecessary(ctx, ing); err != nil {
-				t.Errorf("Error in renewCertificateIfNecessary: %v", err)
+			// Start the certificate renewal process.
+			errorCh := make(chan error)
+			go func() {
+				err := iw.renewValidCertificateIfNecessary(ctx, ing) // Use iwMock here
+				if err != nil {
+					errorCh <- err
+					return
+				}
+				errorCh <- nil
+			}()
+
+			if tt.wantRenewal {
+				// debug
+				klog.Infof("updating middlePaths")
+
+				time.Sleep(2 * time.Second) // Give it some delay
+				// Update the ingress with the final paths.
+				ing.Spec.Rules = createIngressRules(tt.middlePaths)
+				if err := mockClient.Update(context.TODO(), ing); err != nil {
+					t.Fatalf("Failed to update ingress: %v", err)
+				}
+
+				// will block the current goroutine until the data is read from the other side of the channel
+				// watchChan <- watch.Event{Type: watch.Modified, Object: ing}
+
+				go func() {
+					watchChan <- watch.Event{Type: watch.Modified, Object: ing}
+				}()
+
+				// debug
+				klog.Infof("updating finalPaths")
+
+				time.Sleep(2 * time.Second) // Give it some delay
+				// Update the ingress with the final paths.
+				ing.Spec.Rules = createIngressRules(tt.finalPaths)
+				if err := mockClient.Update(context.TODO(), ing); err != nil {
+					t.Fatalf("Failed to update ingress: %v", err)
+				}
+				// // Check if the ingress is updated
+				// newIngFinal := &networkingv1.Ingress{}
+				// err = mockClient.Get(context.Background(), types.NamespacedName{Name: "test-ingress", Namespace: "default"}, newIngFinal)
+				// if err != nil {
+				// 	t.Fatalf("Failed to get ingress: %v", err)
+				// }
+				// // debug
+				// klog.Infof("newIngFinal updated: %v", newIngFinal)
 			}
+
+			// Wait for a response or timeout after a few seconds.
+			select {
+			case err := <-errorCh:
+				assert.Nil(t, err)
+			case <-time.After(20 * time.Second): // Adjust as needed
+				t.Fatal("Timeout while waiting for processIngressForRenewal response")
+			}
+
+			// Delete the Ingress object.
+			if err := mockClient.Delete(context.Background(), ing); err != nil {
+				t.Fatalf("Failed to delete Ingress: %v", err)
+			}
+
 		})
 	}
+}
+
+func TestWaitForAcmeChallenge(t *testing.T) {
+	ctx := context.TODO()
+
+	// Configuration & Mock setup
+	// Create the mock client for ingress watching
+	fakeK8sClient := &FakeKubernetesClient{}
+	watchChan := make(chan watch.Event)
+	fakeWatcher := &FakeWatcher{
+		resultCh: watchChan,
+	}
+	fakeK8sClient.On("Watch", mock.Anything, mock.Anything, mock.Anything).Return(fakeWatcher, nil)
+
+	// Create the mock client for k8s resources
+	mockClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+
+	// Use fakeK8sClient for IngressWatcher
+	iw, err := setupIngressWatcherMock(mockClient, fakeK8sClient)
+	if err != nil {
+		t.Fatalf("Failed to setup IngressWatcher: %v", err)
+	}
+
+	// Define the namespace and ingress name.
+	namespace := "default"
+	ingressName := "test-ingress"
+
+	// Create an ingress without the acme challenge path.
+	ing := generateIngress(ingressName, namespace, nil, []string{"/testpath"})
+	if err := mockClient.Create(ctx, ing); err != nil {
+		t.Fatalf("Failed to create initial ingress: %v", err)
+	}
+
+	// Run waitForAcmeChallenge in a goroutine.
+	goErrCh := make(chan error)
+	go func() {
+		goErrCh <- iw.waitForAcmeChallenge(ctx, namespace, ingressName)
+	}()
+
+	// Simulate real-world delay before an update
+	time.Sleep(2 * time.Second)
+
+	// Update the ingress to include the acme challenge path.
+	ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths = append(ing.Spec.Rules[0].IngressRuleValue.HTTP.Paths, networkingv1.HTTPIngressPath{Path: "/.well-known/acme-challenge"})
+	if err := mockClient.Update(ctx, ing); err != nil {
+		t.Fatalf("Failed to update ingress: %v", err)
+	}
+
+	// Trigger the watch event
+	watchChan <- watch.Event{Type: watch.Modified, Object: ing}
+
+	// Wait for the goroutine to finish and check the result.
+	select {
+	case err := <-goErrCh:
+		assert.Nil(t, err)
+	case <-time.After(20 * time.Second): // Adjust as needed
+		t.Fatal("Timeout while waiting for waitForAcmeChallenge response")
+	}
+}
+
+//
+//
+//
+
+func TestNewIngressWatcher(t *testing.T) {
+	fakeClientset := fake.NewSimpleClientset()
+
+	t.Run("successfully initialize an IngressWatcher", func(t *testing.T) {
+		// Mock the stopCh
+		stopCh := make(chan struct{})
+		defer close(stopCh)
+
+		// TODO: Mock config.GetConfig() to return a dummy configuration
+
+		iw, err := NewIngressWatcher(fakeClientset, stopCh)
+		assert.NoError(t, err)
+		assert.NotNil(t, iw)
+
+		// TODO: Check other attributes of iw to ensure they are correctly set up
+	})
+
+	// TODO: Add more test cases for negative scenarios like failing to get config, failing to set up the scheme, etc.
+}
+
+func TestIsBackendHttpAnnotations(t *testing.T) {
+	ctx := context.TODO()
+
+	t.Run("returns true when backend protocol is HTTPS", func(t *testing.T) {
+		ing := &networkingv1.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"nginx.ingress.kubernetes.io/backend-protocol": "HTTPS",
+				},
+			},
+		}
+
+		result := isBackendHttpAnnotations(ctx, ing)
+		assert.True(t, result)
+	})
+
+	t.Run("returns false when backend protocol label is missing", func(t *testing.T) {
+		ing := &networkingv1.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{},
+			},
+		}
+
+		result := isBackendHttpAnnotations(ctx, ing)
+		assert.False(t, result)
+	})
+
+	t.Run("returns false when backend protocol is not HTTPS", func(t *testing.T) {
+		ing := &networkingv1.Ingress{
+			ObjectMeta: metav1.ObjectMeta{
+				Labels: map[string]string{
+					"nginx.ingress.kubernetes.io/backend-protocol": "HTTP",
+				},
+			},
+		}
+
+		result := isBackendHttpAnnotations(ctx, ing)
+		assert.False(t, result)
+	})
+}
+
+func TestIsAcmeChallengePath(t *testing.T) {
+	ctx := context.TODO()
+
+	t.Run("returns true when string contains .well-known/acme-challenge", func(t *testing.T) {
+		p := "/.well-known/acme-challenge/test"
+		result := isAcmeChallengePath(ctx, p)
+		assert.True(t, result)
+	})
+
+	t.Run("returns false when string does not contain .well-known/acme-challenge", func(t *testing.T) {
+		p := "/testpath/test"
+		result := isAcmeChallengePath(ctx, p)
+		assert.False(t, result)
+	})
+
+	t.Run("returns true when .well-known/acme-challenge is embedded in string", func(t *testing.T) {
+		p := "/test/.well-known/acme-challenge/testpath"
+		result := isAcmeChallengePath(ctx, p)
+		assert.True(t, result)
+	})
+}
+
+func TestContainsAcmeChallenge(t *testing.T) {
+	ctx := context.TODO()
+
+	t.Run("returns true when Ingress contains .well-known/acme-challenge in a path", func(t *testing.T) {
+		ing := &networkingv1.Ingress{
+			Spec: networkingv1.IngressSpec{
+				Rules: []networkingv1.IngressRule{
+					{
+						IngressRuleValue: networkingv1.IngressRuleValue{
+							HTTP: &networkingv1.HTTPIngressRuleValue{
+								Paths: []networkingv1.HTTPIngressPath{
+									{Path: "/.well-known/acme-challenge/test"},
+									{Path: "/testpath/test"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		result := containsAcmeChallenge(ctx, ing)
+		assert.True(t, result)
+	})
+
+	t.Run("returns false when Ingress does not contain .well-known/acme-challenge in any path", func(t *testing.T) {
+		ing := &networkingv1.Ingress{
+			Spec: networkingv1.IngressSpec{
+				Rules: []networkingv1.IngressRule{
+					{
+						IngressRuleValue: networkingv1.IngressRuleValue{
+							HTTP: &networkingv1.HTTPIngressRuleValue{
+								Paths: []networkingv1.HTTPIngressPath{
+									{Path: "/testpath1/test"},
+									{Path: "/testpath2/test"},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		result := containsAcmeChallenge(ctx, ing)
+		assert.False(t, result)
+	})
 }
