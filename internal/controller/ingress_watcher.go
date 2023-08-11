@@ -139,12 +139,6 @@ func NewIngressWatcher(clientKube kubernetes.Interface, stopCh <-chan struct{}) 
 	// After starting the IngressInformer
 	go iw.IngressInformer.Run(stopCh)
 
-	// // List all existing Ingress resources
-	// _, err = clientKube.NetworkingV1().Ingresses("").List(context.TODO(), metav1.ListOptions{})
-	// if err != nil {
-	// 	klog.Errorf("Failed to list existing ingresses: %v", err)
-	// }
-
 	// Wait for the cache to be synced.
 	if !cache.WaitForCacheSync(stopCh, iw.IngressInformer.HasSynced) {
 		return nil, fmt.Errorf("failed to wait for caches to sync")
@@ -230,7 +224,7 @@ func (iw *IngressWatcher) removeHTTPSAnnotation(ctx context.Context, ing *networ
 			return err
 		}
 	} else {
-		errMassage := fmt.Sprintf("key %s is locked, and should be unlocked", key)
+		errMassage := fmt.Sprintf("key %s is locked, and it should be unlocked", key)
 		klog.Errorf(errMassage)
 		return errors.New(errMassage)
 	}
@@ -356,6 +350,7 @@ func isAcmeChallengePath(ctx context.Context, p string) bool {
 	klog.Info("debug - isAcmeChallengePath")
 
 	const acmeChallengePath = ".well-known/acme-challenge"
+
 	return strings.Contains(p, acmeChallengePath)
 }
 

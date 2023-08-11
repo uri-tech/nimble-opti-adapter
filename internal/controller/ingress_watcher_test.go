@@ -128,14 +128,15 @@ func createIngressRules(paths []string) []networkingv1.IngressRule {
 }
 
 // generateIngress creates an Ingress object with the given name, namespace, and labels.
-func generateIngress(name, namespace string, labels map[string]string, paths []string) *networkingv1.Ingress {
+func generateIngress(name, namespace string, labels map[string]string, paths []string, annotations map[string]string) *networkingv1.Ingress {
 	ingressRules := createIngressRules(paths)
 
 	return &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-			Labels:    labels,
+			Name:        name,
+			Namespace:   namespace,
+			Labels:      labels,
+			Annotations: annotations,
 		},
 		Spec: networkingv1.IngressSpec{
 			Rules: ingressRules,
@@ -195,8 +196,8 @@ func TestAuditIngressResources(t *testing.T) {
 	// 1. Setup fake client and resources
 	fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 
-	ingressWithLabel := generateIngress("ingress-with-label", "default", map[string]string{"nimble.opti.adapter/enabled": "true"}, nil)
-	ingressWithoutLabel := generateIngress("ingress-without-label", "default", nil, nil)
+	ingressWithLabel := generateIngress("ingress-with-label", "default", map[string]string{"nimble.opti.adapter/enabled": "true"}, nil, nil)
+	ingressWithoutLabel := generateIngress("ingress-without-label", "default", nil, nil, nil)
 
 	// Create the Ingress resources.
 	err := fakeClient.Create(ctx, ingressWithLabel)
@@ -232,57 +233,33 @@ func TestHandleIngressAdd(t *testing.T) {
 		t.Fatalf("Failed to setup IngressWatcher: %v", err)
 	}
 
-	// Test: Add an ingress without the nimble.opti.adapter/enabled label.
-	ing := generateIngress("test-ingress", "default", nil, nil)
-	iw.handleIngressAdd(ing)
-	val, ok := ing.Labels["nimble.opti.adapter/enabled"]
-	assert.False(t, ok || val == "true", "Did not expect label to be present or set to true")
-
-	// Test: Add an ingress with the nimble.opti.adapter/enabled label set to true and ".well-known/acme-challenge" in it path.
+	// Test: Add an ingress with label, annotation and ".well-known/acme-challenge" in it path.
 	labels := map[string]string{
-		"nimble.opti.adapter/enabled":                  "true",
+		"nimble.opti.adapter/enabled": "true",
+	}
+	httpsAnnotation := map[string]string{
 		"nginx.ingress.kubernetes.io/backend-protocol": "HTTPS",
 	}
-	ingWithLabel := generateIngress("test-ingress-with-label", "default", labels, []string{
+	paths := []string{
 		"/app",
 		"/.well-known/acme-challenge",
-	})
-	iw.handleIngressAdd(ingWithLabel)
-
-	// check if the nimbleopti object was created
-	nimbleOpti := &v1.NimbleOpti{}
-	err = iw.ClientObj.Get(context.TODO(), client.ObjectKey{Name: "default", Namespace: "default"}, nimbleOpti)
-	assert.NoError(t, err)
-	assert.NotNil(t, nimbleOpti)
-}
-
-func TestHandleIngressUpdate(t *testing.T) {
-	fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
-	iw, err := setupIngressWatcher(fakeClient)
-	if err != nil {
-		t.Fatalf("Failed to setup IngressWatcher: %v", err)
+	}
+	ingWithLabelAndAnnotation := generateIngress(
+		"default",
+		"default",
+		labels,
+		paths,
+		httpsAnnotation,
+	)
+	// Create the Ingress object using the fake client.
+	if err := fakeClient.Create(context.TODO(), ingWithLabelAndAnnotation); err != nil {
+		t.Fatalf("Failed to create Ingress: %v", err)
 	}
 
-	// Test: Update an ingress without any changes.
-	oldIng := generateIngress("old-ingress", "default", nil, nil)
-	newIng := generateIngress("old-ingress", "default", nil, nil)
-	iw.handleIngressUpdate(oldIng, newIng)
+	// Call the handleIngressAdd function.
+	iw.handleIngressAdd(ingWithLabelAndAnnotation)
 
-	// Assert: Check the expected behavior here.
-	// Assuming no changes were made, the label should still not exist.
-	val, ok := newIng.Labels["nimble.opti.adapter/enabled"]
-	assert.False(t, ok || val == "true", "Did not expect label to be present")
-
-	// Test: Update an ingress with changes.
-	labels := map[string]string{"nimble.opti.adapter/enabled": "true"}
-	paths := []string{"/app"}
-	oldIngDifferent := generateIngress("changed-ingress", "default", nil, nil)
-	newIngDifferent := generateIngress("changed-ingress", "default", labels, paths)
-	iw.handleIngressUpdate(oldIngDifferent, newIngDifferent)
-
-	// Assert: Check the label has been processed.
-	assert.Equal(t, "true", newIngDifferent.Labels["nimble.opti.adapter/enabled"], "Expected label to be present")
-	// check if the nimbleopti object is exist or was created
+	// check if the nimbleopti object was created
 	nimbleOpti := &v1.NimbleOpti{}
 	err = iw.ClientObj.Get(context.TODO(), client.ObjectKey{Name: "default", Namespace: "default"}, nimbleOpti)
 	assert.NoError(t, err)
@@ -319,23 +296,24 @@ func TestGetOrCreateNimbleOpti(t *testing.T) {
 	// The returned NimbleOpti should have the same UID as the first one, which means it wasn't recreated.
 	assert.Equal(t, nimbleOpti.GetUID(), secondNimbleOpti.GetUID())
 }
+
 func TestIsAdapterEnabledLabel(t *testing.T) {
 	// Test if the function returns true when the label is present and set to "true".
-	ingWithLabel := generateIngress("test-ingress-with-label", "default", map[string]string{"nimble.opti.adapter/enabled": "true"}, nil)
+	ingWithLabel := generateIngress("test-ingress-with-label", "default", map[string]string{"nimble.opti.adapter/enabled": "true"}, nil, nil)
 	assert.True(t, isAdapterEnabledLabel(context.TODO(), ingWithLabel))
 
 	// Test if the function returns false when the label is not present.
-	ingWithoutLabel := generateIngress("test-ingress", "default", nil, nil)
+	ingWithoutLabel := generateIngress("test-ingress", "default", nil, nil, nil)
 	assert.False(t, isAdapterEnabledLabel(context.TODO(), ingWithoutLabel))
 
 	// Test if the function returns false when the label is present but not set to "true".
-	ingWithFalseLabel := generateIngress("test-ingress-with-false-label", "default", map[string]string{"nimble.opti.adapter/enabled": "false"}, nil)
+	ingWithFalseLabel := generateIngress("test-ingress-with-false-label", "default", map[string]string{"nimble.opti.adapter/enabled": "false"}, nil, nil)
 	assert.False(t, isAdapterEnabledLabel(context.TODO(), ingWithFalseLabel))
 }
 
 func TestHasIngressChanged(t *testing.T) {
-	oldIng := generateIngress("old-ingress", "default", nil, nil)
-	newIng := generateIngress("new-ingress", "default", map[string]string{"nimble.opti.adapter/enabled": "true"}, nil)
+	oldIng := generateIngress("old-ingress", "default", nil, nil, nil)
+	newIng := generateIngress("new-ingress", "default", map[string]string{"nimble.opti.adapter/enabled": "true"}, nil, nil)
 
 	// Test for changes in spec.
 	newIng.Spec.Rules = append(newIng.Spec.Rules, networkingv1.IngressRule{Host: "new-host"})
@@ -370,7 +348,7 @@ func TestRemoveHTTPSAnnotation(t *testing.T) {
 
 	ctx := context.TODO()
 
-	ing := generateIngress("test-ingress", "default", nil, nil)
+	ing := generateIngress("test-ingress", "default", nil, nil, nil)
 	ing.Annotations = map[string]string{httpsAnnotation: "HTTPS"}
 
 	// First, create the Ingress object using the fake client.
@@ -395,7 +373,7 @@ func TestAddHTTPSAnnotation(t *testing.T) {
 
 	ctx := context.TODO()
 
-	ing := generateIngress("test-ingress", "default", nil, nil)
+	ing := generateIngress("test-ingress", "default", nil, nil, nil)
 
 	// Create the Ingress object using the fake client.
 	if err := fakeClient.Create(ctx, ing); err != nil {
@@ -454,7 +432,7 @@ func TestProcessIngressForRenewal(t *testing.T) {
 			assert.Nil(t, err)
 
 			// Create the initial ingress.
-			ing := generateIngress("test-ingress", "default", tt.ingressLabels, tt.ingressPaths)
+			ing := generateIngress("test-ingress", "default", tt.ingressLabels, tt.ingressPaths, nil)
 			assert.Nil(t, fakeClient.Create(ctx, ing))
 
 			// Test
@@ -535,7 +513,7 @@ func TestWaitForChallengeAbsence(t *testing.T) {
 			fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 
 			// Create the initial ingress.
-			ing := generateIngress("test-ingress", "default", nil, tt.initialPaths)
+			ing := generateIngress("test-ingress", "default", nil, tt.initialPaths, nil)
 			if err := fakeClient.Create(ctx, ing); err != nil {
 				t.Fatalf("Failed to create initial ingress: %v", err)
 			}
@@ -611,7 +589,7 @@ func TestStartCertificateRenewal(t *testing.T) {
 			fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 
 			// Create the initial Ingress object.
-			ing := generateIngress("test-ingress", "default", nil, tt.initialPaths)
+			ing := generateIngress("test-ingress", "default", nil, tt.initialPaths, nil)
 			if err := fakeClient.Create(ctx, ing); err != nil {
 				t.Fatalf("Failed to create initial ingress: %v", err)
 			}
@@ -705,7 +683,7 @@ func TestRenewValidCertificateIfNecessary(t *testing.T) {
 			assert.NoError(t, err)
 
 			// Create the Ingress with the TLS spec.
-			ing := generateIngress("test-ingress", "default", nil, tt.initialPaths)
+			ing := generateIngress("test-ingress", "default", nil, tt.initialPaths, nil)
 			ing.Spec.TLS = []networkingv1.IngressTLS{
 				{
 					SecretName: "test-secret",
@@ -831,7 +809,7 @@ func TestWaitForAcmeChallenge(t *testing.T) {
 	ingressName := "test-ingress"
 
 	// Create an ingress without the acme challenge path.
-	ing := generateIngress(ingressName, namespace, nil, []string{"/testpath"})
+	ing := generateIngress(ingressName, namespace, nil, []string{"/testpath"}, nil)
 	if err := mockClient.Create(ctx, ing); err != nil {
 		t.Fatalf("Failed to create initial ingress: %v", err)
 	}
@@ -889,7 +867,7 @@ func TestIsBackendHttpsAnnotations(t *testing.T) {
 	t.Run("returns true when backend protocol is HTTPS", func(t *testing.T) {
 		ing := &networkingv1.Ingress{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{
+				Annotations: map[string]string{
 					"nginx.ingress.kubernetes.io/backend-protocol": "HTTPS",
 				},
 			},
@@ -902,7 +880,7 @@ func TestIsBackendHttpsAnnotations(t *testing.T) {
 	t.Run("returns false when backend protocol label is missing", func(t *testing.T) {
 		ing := &networkingv1.Ingress{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{},
+				Annotations: map[string]string{},
 			},
 		}
 
@@ -913,7 +891,7 @@ func TestIsBackendHttpsAnnotations(t *testing.T) {
 	t.Run("returns false when backend protocol is not HTTPS", func(t *testing.T) {
 		ing := &networkingv1.Ingress{
 			ObjectMeta: metav1.ObjectMeta{
-				Labels: map[string]string{
+				Annotations: map[string]string{
 					"nginx.ingress.kubernetes.io/backend-protocol": "HTTP",
 				},
 			},

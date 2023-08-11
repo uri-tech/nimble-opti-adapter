@@ -76,7 +76,6 @@ func parseFlags() {
 			"Enabling this will ensure there is only one active controller manager.")
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
-
 }
 
 // Entry point of the program.
