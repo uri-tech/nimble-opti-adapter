@@ -471,24 +471,11 @@ func TestProcessIngressForRenewal(t *testing.T) {
 
 			if tt.wantRenewal {
 				// debug
-				klog.Infof("Updating ingress to trigger renewal")
+				t.Log("Updating ingress to trigger renewal")
 
 				time.Sleep(2 * time.Second)
 				// Update the ingress with the final paths.
-				ing.Spec.Rules = nil
-				for _, path := range []string{"/app"} {
-					ing.Spec.Rules = append(ing.Spec.Rules, networkingv1.IngressRule{
-						IngressRuleValue: networkingv1.IngressRuleValue{
-							HTTP: &networkingv1.HTTPIngressRuleValue{
-								Paths: []networkingv1.HTTPIngressPath{
-									{
-										Path: path,
-									},
-								},
-							},
-						},
-					})
-				}
+				ing.Spec.Rules = createIngressRules([]string{"/app"})
 				if err := fakeClient.Update(context.TODO(), ing); err != nil {
 					t.Fatalf("Failed to update ingress: %v", err)
 				}
@@ -575,20 +562,7 @@ func TestWaitForChallengeAbsence(t *testing.T) {
 			time.Sleep(2 * time.Second)
 
 			// Update the ingress with the final paths.
-			ing.Spec.Rules = nil
-			for _, path := range tt.finalPaths {
-				ing.Spec.Rules = append(ing.Spec.Rules, networkingv1.IngressRule{
-					IngressRuleValue: networkingv1.IngressRuleValue{
-						HTTP: &networkingv1.HTTPIngressRuleValue{
-							Paths: []networkingv1.HTTPIngressPath{
-								{
-									Path: path,
-								},
-							},
-						},
-					},
-				})
-			}
+			ing.Spec.Rules = createIngressRules(tt.finalPaths)
 			if err := fakeClient.Update(ctx, ing); err != nil {
 				t.Fatalf("Failed to update ingress: %v", err)
 			}
@@ -787,7 +761,7 @@ func TestRenewValidCertificateIfNecessary(t *testing.T) {
 
 			if tt.wantRenewal {
 				// debug
-				klog.Infof("updating middlePaths")
+				t.Log("updating middlePaths")
 
 				time.Sleep(2 * time.Second) // Give it some delay
 				// Update the ingress with the final paths.
@@ -804,7 +778,7 @@ func TestRenewValidCertificateIfNecessary(t *testing.T) {
 				}()
 
 				// debug
-				klog.Infof("updating finalPaths")
+				t.Log("updating finalPaths")
 
 				time.Sleep(2 * time.Second) // Give it some delay
 				// Update the ingress with the final paths.
@@ -812,14 +786,6 @@ func TestRenewValidCertificateIfNecessary(t *testing.T) {
 				if err := mockClient.Update(context.TODO(), ing); err != nil {
 					t.Fatalf("Failed to update ingress: %v", err)
 				}
-				// // Check if the ingress is updated
-				// newIngFinal := &networkingv1.Ingress{}
-				// err = mockClient.Get(context.Background(), types.NamespacedName{Name: "test-ingress", Namespace: "default"}, newIngFinal)
-				// if err != nil {
-				// 	t.Fatalf("Failed to get ingress: %v", err)
-				// }
-				// // debug
-				// klog.Infof("newIngFinal updated: %v", newIngFinal)
 			}
 
 			// Wait for a response or timeout after a few seconds.
@@ -897,10 +863,6 @@ func TestWaitForAcmeChallenge(t *testing.T) {
 	}
 }
 
-//
-//
-//
-
 func TestNewIngressWatcher(t *testing.T) {
 	fakeClientset := fake.NewSimpleClientset()
 
@@ -921,7 +883,7 @@ func TestNewIngressWatcher(t *testing.T) {
 	// TODO: Add more test cases for negative scenarios like failing to get config, failing to set up the scheme, etc.
 }
 
-func TestIsBackendHttpAnnotations(t *testing.T) {
+func TestIsBackendHttpsAnnotations(t *testing.T) {
 	ctx := context.TODO()
 
 	t.Run("returns true when backend protocol is HTTPS", func(t *testing.T) {
@@ -933,7 +895,7 @@ func TestIsBackendHttpAnnotations(t *testing.T) {
 			},
 		}
 
-		result := isBackendHttpAnnotations(ctx, ing)
+		result := isBackendHttpsAnnotations(ctx, ing)
 		assert.True(t, result)
 	})
 
@@ -944,7 +906,7 @@ func TestIsBackendHttpAnnotations(t *testing.T) {
 			},
 		}
 
-		result := isBackendHttpAnnotations(ctx, ing)
+		result := isBackendHttpsAnnotations(ctx, ing)
 		assert.False(t, result)
 	})
 
@@ -957,7 +919,7 @@ func TestIsBackendHttpAnnotations(t *testing.T) {
 			},
 		}
 
-		result := isBackendHttpAnnotations(ctx, ing)
+		result := isBackendHttpsAnnotations(ctx, ing)
 		assert.False(t, result)
 	})
 }
@@ -988,20 +950,13 @@ func TestContainsAcmeChallenge(t *testing.T) {
 	ctx := context.TODO()
 
 	t.Run("returns true when Ingress contains .well-known/acme-challenge in a path", func(t *testing.T) {
+
+		paths := []string{"/.well-known/acme-challenge/test", "/testpath/test"}
+		rules := createIngressRules(paths)
+
 		ing := &networkingv1.Ingress{
 			Spec: networkingv1.IngressSpec{
-				Rules: []networkingv1.IngressRule{
-					{
-						IngressRuleValue: networkingv1.IngressRuleValue{
-							HTTP: &networkingv1.HTTPIngressRuleValue{
-								Paths: []networkingv1.HTTPIngressPath{
-									{Path: "/.well-known/acme-challenge/test"},
-									{Path: "/testpath/test"},
-								},
-							},
-						},
-					},
-				},
+				Rules: rules,
 			},
 		}
 		result := containsAcmeChallenge(ctx, ing)
@@ -1009,20 +964,12 @@ func TestContainsAcmeChallenge(t *testing.T) {
 	})
 
 	t.Run("returns false when Ingress does not contain .well-known/acme-challenge in any path", func(t *testing.T) {
+		paths := []string{"/testpath1/test", "/testpath2/test"}
+		rules := createIngressRules(paths)
+
 		ing := &networkingv1.Ingress{
 			Spec: networkingv1.IngressSpec{
-				Rules: []networkingv1.IngressRule{
-					{
-						IngressRuleValue: networkingv1.IngressRuleValue{
-							HTTP: &networkingv1.HTTPIngressRuleValue{
-								Paths: []networkingv1.HTTPIngressPath{
-									{Path: "/testpath1/test"},
-									{Path: "/testpath2/test"},
-								},
-							},
-						},
-					},
-				},
+				Rules: rules,
 			},
 		}
 		result := containsAcmeChallenge(ctx, ing)

@@ -3,7 +3,6 @@ module github.com/uri-tech/nimble-opti-adapter
 go 1.20
 
 require (
-	github.com/cert-manager/cert-manager v1.12.3
 	github.com/onsi/ginkgo/v2 v2.9.5
 	github.com/onsi/gomega v1.27.7
 	github.com/prometheus/client_golang v1.16.0
@@ -72,14 +71,7 @@ require (
 	k8s.io/component-base v0.27.2 // indirect
 	k8s.io/kube-openapi v0.0.0-20230515203736-54b630e78af5 // indirect
 	k8s.io/utils v0.0.0-20230505201702-9f6742963106 // indirect
-	sigs.k8s.io/gateway-api v0.7.0 // indirect
 	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 	sigs.k8s.io/yaml v1.3.0 // indirect
 )
-
-// local replace
-// replace (
-// 	// github.com/uri-tech/nimble-opti-adapter => ../nimble-opti-adapter
-// 	// github.com/uri-tech/nimble-opti-adapter/metrics => ../nimble-opti-adapter/metrics
-// )

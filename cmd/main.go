@@ -26,11 +26,11 @@ import (
 
 	adapterv1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
 	"github.com/uri-tech/nimble-opti-adapter/internal/controller"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -46,17 +46,17 @@ var (
 	enableLeaderElection bool
 	// Configuration options for the zap logger.
 	opts = zap.Options{
-		Development: true,
+		Development: false,
+		// Only show warnings and above
+		Level: zapcore.Level(-2), // Only show warnings and above
 	}
+
 	// Logger for setup processes.
 	setupLog = ctrl.Log.WithName("setup")
 )
 
 // Initialize command line flags.
 func init() {
-	// debug
-	klog.InfoS("debug - init")
-
 	// Add schemes for client-go and adapterv1.
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(adapterv1.AddToScheme(scheme))
@@ -81,12 +81,6 @@ func parseFlags() {
 
 // Entry point of the program.
 func main() {
-	// debug
-	klog.InfoS("debug - main")
-
-	// Parse command line flags.
-	flag.Parse()
-
 	// Set up the logger.
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
@@ -104,10 +98,6 @@ func main() {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
-
-	// // Start Prometheus metrics server.
-	// http.Handle("/metrics3", promhttp.Handler())
-	// go http.ListenAndServe(metricsAddr, nil)
 
 	// Initialize the Kubernetes client.
 	stopCh := make(chan struct{})
