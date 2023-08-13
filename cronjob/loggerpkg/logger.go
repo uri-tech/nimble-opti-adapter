@@ -20,13 +20,19 @@ var (
 // This function runs when the package is imported, ensuring the logger is
 // set up and ready for use in other packages.
 func init() {
-	runMode := os.Getenv("RUN_MODE")
-	logOutput := os.Getenv("LOG_OUTPUT")
-	logLevel := zap.DebugLevel // default to debug
-	if runMode == "prod" {
+	// Set default log level to debug.
+	logLevel := zap.DebugLevel
+	if runMode := os.Getenv("RUN_MODE"); runMode != "dev" {
 		logLevel = zap.InfoLevel
 	}
 
+	// Set default log output to console.
+	logOutput := "console"
+	if envLogOutput := os.Getenv("LOG_OUTPUT"); envLogOutput != "" {
+		logOutput = envLogOutput
+	}
+
+	// Initialize logger with default configuration.
 	cfg := zap.Config{
 		Encoding:         logOutput, // Use console encoding
 		OutputPaths:      []string{"stdout"},
@@ -54,21 +60,6 @@ func init() {
 	}
 	defer logger.Sync() // Ensure logs are flushed before exiting.
 	sugarLogger = logger.Sugar()
-
-	// for json format:
-	// cfg := zap.NewProductionConfig()
-	// cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
-	// logLevel := zap.NewAtomicLevel()
-
-	// // Here, you can set the log level to whatever you want.
-	// // For instance, to set it to "debug":
-	// logLevel.SetLevel(zap.DebugLevel)
-	// cfg.Level = logLevel
-
-	// logger, _ = cfg.Build()
-	// defer logger.Sync() // Ensure logs are flushed before exiting.
-
-	// sugarLogger = logger.Sugar()
 }
 
 // GetLogger returns the main instance of the sugared logger.

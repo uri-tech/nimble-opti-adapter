@@ -1,0 +1,15 @@
+---
+# Create a ConfigMap that holds the configuration data.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ingress-modify-config
+  namespace: ingress-modify-ns
+data:
+  RUN_MODE: "dev" # dev or prod.
+  LOG_OUTPUT: "console" # console or json.
+  CERTIFICATE_RENEWAL_THRESHOLD: "60" # in days.
+  ANNOTATION_REMOVAL_DELAY: "10" # in seconds.
+  ADMIN_USER_PERMISSION: "false" # "true" or "false" - read and delete secrets.
+---
+

@@ -1,31 +1,53 @@
-# Use the official Go image from the DockerHub
-FROM golang:1.20 as builder
+# Stage 1: Build the application
+FROM golang:1.20-alpine AS builder
 
-# Set the Current Working Directory inside the container
+# Install required packages for building the application
+RUN apk update && apk add --no-cache git make musl-dev go
+
+# Set the working directory
 WORKDIR /app
 
-# Copy go mod and sum files
+# Copy go.mod and go.sum files to cache dependencies
 COPY go.mod go.sum ./
 
-# Download dependencies
+# Download dependencies before copying the application source code
 RUN go mod download
 
-# Copy the source code into the container
-COPY cmd/ cmd/
-COPY internal/ internal/
+# Copy the application code into the container
+COPY . .
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ingress-annotation-modifier ./cmd/ingress-annotation-modifier
+# RUN go build ./cmd/ingressodifier/mai-annotation-mn.go
+RUN go build -o ingress-annotation-modifier ./cronjob/cmd/ingress-annotation-modifier
 
-### Start a new stage from scratch ###
-FROM alpine:latest  
+############################
+# STEP 2 build a small image
+############################
+# FROM alpine:3.17.2
+FROM alpine:latest
 
-RUN apk --no-cache add ca-certificates
+# Install required packages for building the application
+RUN mkdir -p /myapp/src
 
-WORKDIR /root/
+# Install required packages for running the application. --no-cache option to avoid creating a cache in the Docker image.
+RUN apk add --no-cache ca-certificates
 
-# Copy the pre-built binary from the previous stage
+# # Create a non-root user to run the application
+# RUN adduser -D -g '' appuser
+
+# Remove unnecessary packages
+RUN rm -rf /var/cache/*
+# RUN apk del openssh-client && rm -rf /var/cache/apk/*
+
+# # run the app as non-root user
+# USER appuser
+
+# Set the working directory and copy the binary from the builder stage
+WORKDIR /myapp
+
+# Copy the binary and specific files and folders from the builder stage
+# COPY --from=builder --chown=appuser:appuser /app/ingress-annotation-modifier .
 COPY --from=builder /app/ingress-annotation-modifier .
 
-# Command to run the executable
-CMD ["./ingress-annotation-modifier"]
+# Set the command to run the binary
+CMD ["/myapp/ingress-annotation-modifier"]

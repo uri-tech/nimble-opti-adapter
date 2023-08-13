@@ -2,7 +2,8 @@
 set -e
 
 DOCKER_USERNAME="${DOCKER_USERNAME:-nimbleopti}"
-DOCKER_IMAGE_NAME="${DOCKER_IMAGE_NAME:-${DOCKER_USERNAME}/nimble-opti-adapter:latest}"
+IMAGE_TAG="${IMAGE_TAG:-v1.0.0}"
+DOCKER_IMAGE_NAME="${DOCKER_IMAGE_NAME:-${DOCKER_USERNAME}/nimble-opti-adapter}"
 CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.11.0}"
 SLEEP_TIME="${SLEEP_TIME:-1}"
 BUILD_PLATFORM="${BUILD_PLATFORM:-local}" # local or all
@@ -71,16 +72,16 @@ make install
 # Docker operations
 if [[ "$BUILD_PLATFORM" == "local" ]]; then
   echo "Building Docker image..."
-  docker build -t "$DOCKER_IMAGE_NAME" .
+  docker build -t "$DOCKER_IMAGE_NAME:latest" .
   echo "Pushing Docker image to registry..."
   docker push "$DOCKER_IMAGE_NAME"
 elif [[ "$BUILD_PLATFORM" == "all" ]]; then
   echo "Building Docker image for all platforms..."
   DOCKER_TARGET_PLATFORM="linux/arm64,linux/amd64"
-  docker buildx build /mnt/c/project/BuildTech/refael-naaman/official-website/refael-naaman \
+  docker buildx build . \
     --platform $DOCKER_TARGET_PLATFORM \
-    --tag registry.tech-ua.com:443/refael-naaman-official-website:$IMAGE_TAG --tag registry.tech-ua.com:443/refael-naaman-official-website:latest \
-    --file /mnt/c/project/BuildTech/refael-naaman/official-website/refael-naaman/Dockerfile \
+    --tag $DOCKER_IMAGE_NAME:$IMAGE_TAG --tag $DOCKER_IMAGE_NAME:latest \
+    --file ./Dockerfile \
     --output type=image,push=true
 else
   echo "Invalid BUILD_PLATFORM value. Choose either 'all' or 'local'."

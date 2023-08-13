@@ -38,7 +38,7 @@ func (iw *IngressWatcher) waitForChallengeAbsence(ctx context.Context, timeout t
 			// Get the Ingress
 			ingress := &networkingv1.Ingress{}
 			if err := iw.ClientObj.Get(timeoutCtx, client.ObjectKey{Name: ingName, Namespace: ingNamespace}, ingress); err != nil {
-				// logger.Errorf("Error fetching ingress, %v", err)
+				logger.Errorf("Error fetching ingress, %v", err)
 				elapsedTime := time.Since(startTime)
 				return elapsedTime, err
 			}

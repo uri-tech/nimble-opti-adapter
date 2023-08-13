@@ -1,0 +1,42 @@
+---
+# Create a namespace to logically separate our resources.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-modify-ns
+---
+# Create a ServiceAccount which our CronJob will use to interact with the Kubernetes API.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ingress-modify-sa
+  namespace: ingress-modify-ns
+---
+# Create a ClusterRole that defines permissions to modify Ingress resources across all namespaces and read Secrets.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: ingress-and-secrets-role # Update the name to reflect the broader permissions
+rules:
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list", "watch"]
+---
+# Bind our ServiceAccount to the ClusterRole, granting it the permissions defined above.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: ingress-and-secrets-rolebinding # Update the name to match the role's new name
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: ingress-and-secrets-role # Reference the updated role name
+subjects:
+  - kind: ServiceAccount
+    name: ingress-modify-sa
+    namespace: ingress-modify-ns
+---
+

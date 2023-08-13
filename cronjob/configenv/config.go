@@ -9,6 +9,7 @@ import (
 // Config holds all configuration for our program
 type ConfigEnv struct {
 	RunMode                     string
+	LogOutput                   string
 	CertificateRenewalThreshold int  // in days
 	AnnotationRemovalDelay      int  // in seconds
 	AdminUserPermission         bool // for reading secrets
@@ -21,6 +22,7 @@ func LoadConfig() (*ConfigEnv, error) {
 		CertificateRenewalThreshold: getEnvAsInt("CERTIFICATE_RENEWAL_THRESHOLD", 60),
 		AnnotationRemovalDelay:      getEnvAsInt("ANNOTATION_REMOVAL_DELAY", 10),
 		AdminUserPermission:         getEnv("ADMIN_USER_PERMISSION", "false") == "true",
+		LogOutput:                   getEnv("LOG_OUTPUT", "console"),
 	}
 
 	// Validation
@@ -35,6 +37,11 @@ func validate(cfg *ConfigEnv) error {
 	// Check that RunMode is either 'dev' or 'prod'
 	if cfg.RunMode != "dev" && cfg.RunMode != "prod" {
 		return errors.New("RUN_MODE must be either 'dev' or 'prod'")
+	}
+
+	// Check that LogOutput is either 'console' or 'json'
+	if cfg.LogOutput != "console" && cfg.LogOutput != "json" {
+		return errors.New("LOG_OUTPUT must be either 'console' or 'json'")
 	}
 
 	// Check that CertificateRenewalThreshold is a positive number

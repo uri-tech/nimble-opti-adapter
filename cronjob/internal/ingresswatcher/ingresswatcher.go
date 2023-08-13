@@ -9,10 +9,13 @@ import (
 	"github.com/uri-tech/nimble-opti-adapter/cronjob/configenv"
 	"github.com/uri-tech/nimble-opti-adapter/cronjob/internal/utils"
 	"github.com/uri-tech/nimble-opti-adapter/cronjob/loggerpkg"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
@@ -94,34 +97,47 @@ func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) error {
 				logger.Errorf("Failed to start certificate renewal: %v", err)
 				return err
 			}
-		} else if iw.Config.AdminUserPermission {
+		} else {
 			// Calculate the time remaining for renewal
 			timeRemaining, secretName, err := iw.timeRemainingCertificateUpToRenewal(ctx, &ing)
 			if err != nil {
 				logger.Errorf("Failed to check if the certificate is up to renewal: %v", err)
 				return err
 			}
-
 			// Check if the certificate is up to renewal
 			if timeRemaining <= time.Duration(iw.Config.CertificateRenewalThreshold*24)*time.Hour {
-				// Change secret name in ing.Spec.TLS for make cert-manager create new certificate secret.
+				if iw.Config.AdminUserPermission {
+					// delete connected ingress secret
+					if err := iw.deleteIngressSecret(ctx, ing.Spec.TLS[0].SecretName, ing.Namespace); err != nil {
+						logger.Errorf("Failed to delete ingress secret: %v", err)
+						return err
+					}
 
-				// delete connected ingress secret
-				if err := iw.changeIngressSecretName(ctx, &ing, secretName); err != nil {
-					logger.Errorf("Failed to delete ingress secret: %v", err)
-					return err
+					// sleep for 5 seconds for make sure the secret was deleted
+					time.Sleep(5 * time.Second)
+				} else {
+					// change the connected ingress secret in ing.Spec.TLS for make cert-manager create new certificate secret.
+					if err := iw.changeIngressSecretName(ctx, &ing, secretName); err != nil {
+						logger.Errorf("Failed to delete ingress secret: %v", err)
+						return err
+					}
 				}
-
 				// start certificate renewal
-				_, err := iw.startCertificateRenewalAudit(ctx, &ing)
+				isRenew, err := iw.startCertificateRenewalAudit(ctx, &ing)
 				if err != nil {
 					logger.Errorf("Failed to start certificate renewal: %v", err)
 					return err
 				}
+				if isRenew {
+					logger.Infof("Certificate was renewed, ingress name: %v", ing.Name)
+				}
+			} else {
+				logger.Infof("Certificate is not up to renewal, time remaining: %v", timeRemaining)
 			}
 		}
-
 	}
+	logger.Infof("Finished auditing %d Ingress resources", len(ingresses.Items))
+
 	return nil
 }
 
@@ -198,6 +214,28 @@ func (iw *IngressWatcher) changeIngressSecretName(ctx context.Context, ing *netw
 		logger.Errorf(errMassage)
 		return errors.New(errMassage)
 	}
+
+	return nil
+}
+
+// delete connected ingress secret
+func (iw *IngressWatcher) deleteIngressSecret(ctx context.Context, secretName string, secretNamespace string) error {
+	logger.Debug("deleteIngressSecret")
+
+	// Create a Secret object with only Name and Namespace populated.
+	deleteSecret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: secretNamespace,
+		},
+	}
+
+	// Delete the secret.
+	if err := iw.ClientObj.Delete(ctx, deleteSecret); err != nil {
+		klog.Errorf("Failed to remove secret: %v", err)
+		return err
+	}
+	logger.Infof("Secret %s was deleted", secretName)
 
 	return nil
 }

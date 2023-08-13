@@ -1,57 +1,6 @@
 ---
-# Create a namespace to logically separate our resources.
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: ingress-modify-ns
----
-# Create a ServiceAccount which our CronJob will use to interact with the Kubernetes API.
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: ingress-modify-sa
-  namespace: ingress-modify-ns
----
-# Create a ClusterRole that defines permissions to modify Ingress resources across all namespaces.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: ingress-modify-role
-rules:
-  - apiGroups: ["networking.k8s.io"]
-    resources: ["ingresses"]
-    verbs: ["get", "list", "watch", "update", "patch"]
----
-# Bind our ServiceAccount to the ClusterRole, granting it the permissions defined above.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: ingress-modify-rolebinding
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: ingress-modify-role
-subjects:
-  - kind: ServiceAccount
-    name: ingress-modify-sa
-    namespace: ingress-modify-ns
----
-# Create a ConfigMap that holds the configuration data.
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: ingress-modify-config
-  namespace: ingress-modify-ns
-data:
-  RUN_MODE: "dev" # dev or prod
-  LOG_OUTPUT: "console" # console or json
-  CERTIFICATE_RENEWAL_THRESHOLD: "60" # in days
-  ANNOTATION_REMOVAL_DELAY: "10" # in seconds
-  ADMIN_USER_PERMISSION: false # read and delete secrets
-
----
 # Create a CronJob to run our code on a daily schedule.
-apiVersion: batch/v1beta1
+apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: ingress-modify-cronjob
@@ -65,9 +14,13 @@ spec:
           serviceAccountName: ingress-modify-sa
           containers:
             - name: ingress-modify-container
-              image: YOUR_IMAGE_NAME:latest
-              args:
-                - YOUR_COMMAND_IF_NEEDED
+              image: nimbleopti/cronjob-n-o-a:latest
+              imagePullPolicy: Always # IfNotPresent
+              # args:
+              #   -
+              # envFrom:
+              #   - configMapRef:
+              #       name: ingress-modify-config
               env:
                 - name: RUN_MODE
                   valueFrom:
@@ -105,3 +58,5 @@ spec:
           # If you have a private Docker registry, specify image pull secrets here.
           # imagePullSecrets:
           # - name: myregistrykey
+---
+
