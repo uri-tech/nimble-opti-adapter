@@ -27,6 +27,16 @@ defaultDockerUsername="nimbleopti"
 defaultImageName="${DOCKER_IMAGE_NAME:-${defaultDockerUsername}/cronjob-n-o-a}"
 defaultBuildPlatform="local" # Choices: local or all
 isAdminConfig="${ADMIN_CONFIG:-false}"
+testCode="${TEST_CODE:-true}" # true or false
+
+# Run Go tests
+if [ "$testCode" = "true" ]; then
+  echo "Running Go tests..."
+  go test ./cronjob/... || {
+    echo "Go tests failed"
+    exit 1
+  }
+fi
 
 # Check for existing Minikube and delete if it exists
 if command -v minikube >/dev/null 2>&1; then
