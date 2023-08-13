@@ -34,6 +34,13 @@ func TestRemoveHTTPSAnnotation(t *testing.T) {
 	if err := iw.removeHTTPSAnnotation(ctx, ing); err != nil {
 		t.Fatalf("Failed to remove HTTPS annotation: %v", err)
 	}
+
+	// // Fetch the latest version of the Ingress object
+	// updatedIng := &networkingv1.Ingress{}
+	// if err := fakeClient.Get(ctx, client.ObjectKey{Name: ing.Name, Namespace: ing.Namespace}, updatedIng); err != nil {
+	// 	t.Fatalf("Failed to fetch updated Ingress: %v", err)
+	// }
+
 	_, exists := ing.Annotations[httpsAnnotation]
 	assert.False(t, exists, "Expected HTTPS annotation to be removed")
 }
@@ -58,8 +65,7 @@ func TestAddHTTPSAnnotation(t *testing.T) {
 	if err := iw.addHTTPSAnnotation(ctx, ing); err != nil {
 		t.Fatalf("Failed to add HTTPS annotation: %v", err)
 	}
-	// _, exists := ing.Annotations[httpsAnnotation]
-	// assert.True(t, exists, "Expected HTTPS annotation to be added")
+
 	val, exists := ing.Annotations[httpsAnnotation]
 	assert.True(t, exists && val == "HTTPS", "Expected HTTPS annotation to be added")
 }

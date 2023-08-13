@@ -74,13 +74,12 @@ func (iw *IngressWatcher) waitForChallengeAbsence(ctx context.Context, timeout t
 
 // isContainsAcmeChallenge checks if the given ingress contains any ACME challenge paths.
 func isContainsAcmeChallenge(ctx context.Context, ing *networkingv1.Ingress) bool {
-	// debug
 	logger.Debug("isContainsAcmeChallenge")
 
 	for _, rule := range ing.Spec.Rules {
 		for _, path := range rule.IngressRuleValue.HTTP.Paths {
 			if isAcmeChallengePath(ctx, path.Path) {
-				logger.Debug("Found %s in path %s", ".well-known/acme-challenge", path.Path)
+				logger.Debugf("Found %s in path %s", ".well-known/acme-challenge", path.Path)
 				return true
 			}
 		}
@@ -123,7 +122,6 @@ func (iw *IngressWatcher) timeRemainingCertificateUpToRenewal(ctx context.Contex
 		// Check if the certificate is in PEM or DER format
 		var certDER []byte
 		if strings.Contains(string(certData), "-----BEGIN CERTIFICATE-----") {
-			// debug
 			logger.Debug("renewValidCertificateIfNecessary - PEM format")
 
 			// Decode PEM to get the DER-encoded certificate
@@ -134,7 +132,6 @@ func (iw *IngressWatcher) timeRemainingCertificateUpToRenewal(ctx context.Contex
 			}
 			certDER = block.Bytes
 		} else {
-			// debug
 			logger.Debug("renewValidCertificateIfNecessary - DER format")
 
 			// Assume it's DER format
@@ -149,7 +146,6 @@ func (iw *IngressWatcher) timeRemainingCertificateUpToRenewal(ctx context.Contex
 
 		// Calculate remaining duration until certificate expiry
 		timeRemaining := cert.NotAfter.Sub(time.Now())
-
 		logger.Infof("timeRemaining: %v", timeRemaining)
 
 		return timeRemaining, secretName, nil
