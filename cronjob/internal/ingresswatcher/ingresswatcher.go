@@ -9,13 +9,10 @@ import (
 	"github.com/uri-tech/nimble-opti-adapter/cronjob/configenv"
 	"github.com/uri-tech/nimble-opti-adapter/cronjob/internal/utils"
 	"github.com/uri-tech/nimble-opti-adapter/cronjob/loggerpkg"
-	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
@@ -110,7 +107,7 @@ func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) error {
 				// Change secret name in ing.Spec.TLS for make cert-manager create new certificate secret.
 
 				// delete connected ingress secret
-				if err := iw.deleteIngressSecret(ctx, secretName, ing.Namespace); err != nil {
+				if err := iw.changeIngressSecretName(ctx, &ing, secretName); err != nil {
 					logger.Errorf("Failed to delete ingress secret: %v", err)
 					return err
 				}
@@ -161,28 +158,6 @@ func (iw *IngressWatcher) startCertificateRenewalAudit(ctx context.Context, ing 
 	}
 
 	return isRenew, nil
-}
-
-// delete connected ingress secret
-func (iw *IngressWatcher) deleteIngressSecret(ctx context.Context, secretName string, secretNamespace string) error {
-	// debug
-	logger.Debug("deleteIngressSecret")
-
-	// Create a Secret object with only Name and Namespace populated.
-	deleteSecret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: secretNamespace,
-		},
-	}
-
-	// Delete the secret.
-	if err := iw.ClientObj.Delete(ctx, deleteSecret); err != nil {
-		klog.Errorf("Failed to remove secret: %v", err)
-		return err
-	}
-
-	return nil
 }
 
 // changeIngressSecretName change the secret name in ing.Spec.TLS to make cert-manager create new certificate secret.
