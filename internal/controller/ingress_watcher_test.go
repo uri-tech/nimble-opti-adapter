@@ -28,6 +28,10 @@ import (
 	fakec "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
 
+const (
+	httpsAnnotation = "nginx.ingress.kubernetes.io/backend-protocol"
+)
+
 // FakeKubernetesClient is a structure that holds the fake Client for Kubernetes.
 type FakeKubernetesClient struct {
 	mock.Mock
@@ -337,9 +341,8 @@ func TestHasIngressChanged(t *testing.T) {
 	assert.False(t, hasIngressChanged(context.TODO(), oldIng, oldIng))
 }
 
-const httpsAnnotation = "nginx.ingress.kubernetes.io/backend-protocol"
-
 func TestRemoveHTTPSAnnotation(t *testing.T) {
+
 	fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
 	iw, err := setupIngressWatcher(fakeClient)
 	if err != nil {
@@ -937,7 +940,7 @@ func TestContainsAcmeChallenge(t *testing.T) {
 				Rules: rules,
 			},
 		}
-		result := containsAcmeChallenge(ctx, ing)
+		result := isContainsAcmeChallenge(ctx, ing)
 		assert.True(t, result)
 	})
 
@@ -950,7 +953,7 @@ func TestContainsAcmeChallenge(t *testing.T) {
 				Rules: rules,
 			},
 		}
-		result := containsAcmeChallenge(ctx, ing)
+		result := isContainsAcmeChallenge(ctx, ing)
 		assert.False(t, result)
 	})
 }

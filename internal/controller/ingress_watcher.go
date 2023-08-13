@@ -168,40 +168,6 @@ func (iw *IngressWatcher) handleIngressAdd(obj interface{}) {
 	}
 }
 
-// handleIngressUpdate is called when an Ingress resource is updated.
-// Implement logic to handle Ingress resource updates.
-func (iw *IngressWatcher) handleIngressUpdate(oldObj, newObj interface{}) {
-
-	// debug
-	klog.Info("debug - handleIngressUpdate")
-
-	ctx := context.Background()
-
-	oldIng, ok := oldObj.(*networkingv1.Ingress)
-	if !ok {
-		klog.Error("Expected Ingress in handleIngressUpdate oldObj")
-		return
-	}
-
-	newIng, ok := newObj.(*networkingv1.Ingress)
-	if !ok {
-		klog.Error("Expected Ingress in handleIngressUpdate newObj")
-		return
-	}
-
-	// If the adapter is enabled on the new Ingress and the Ingress has changed, process it.
-	if isAdapterEnabledLabel(ctx, newIng) && hasIngressChanged(ctx, oldIng, newIng) {
-		// debug
-		klog.Infof("Ingress %s/%s has changed, processing", newIng.Namespace, newIng.Name)
-
-		// Process the new Ingress.
-		_, err := iw.processIngressForRenewal(ctx, newIng)
-		if err != nil {
-			klog.ErrorS(err, "error processing ingress")
-		}
-	}
-}
-
 // removeHTTPSAnnotation removes the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation from an Ingress.
 func (iw *IngressWatcher) removeHTTPSAnnotation(ctx context.Context, ing *networkingv1.Ingress) error {
 	// debug
@@ -331,7 +297,7 @@ func (iw *IngressWatcher) processIngressForRenewal(ctx context.Context, ing *net
 	klog.Infof("adapter: %s", adapter)
 
 	// Scan for any path in spec.rules[].http.paths[].path containing .well-known/acme-challenge.
-	if containsAcmeChallenge(ctx, ing) {
+	if isContainsAcmeChallenge(ctx, ing) {
 		// Trigger the certificate renewal process.
 		isRenew, err := iw.startCertificateRenewal(ctx, ing, adapter)
 		if err != nil {
@@ -354,10 +320,10 @@ func isAcmeChallengePath(ctx context.Context, p string) bool {
 	return strings.Contains(p, acmeChallengePath)
 }
 
-// containsAcmeChallenge checks if the given ingress contains any ACME challenge paths.
-func containsAcmeChallenge(ctx context.Context, ing *networkingv1.Ingress) bool {
+// isContainsAcmeChallenge checks if the given ingress contains any ACME challenge paths.
+func isContainsAcmeChallenge(ctx context.Context, ing *networkingv1.Ingress) bool {
 	// debug
-	klog.Info("debug - containsAcmeChallenge")
+	klog.Info("debug - isContainsAcmeChallenge")
 
 	for _, rule := range ing.Spec.Rules {
 		for _, path := range rule.IngressRuleValue.HTTP.Paths {
@@ -728,7 +694,7 @@ func (iw *IngressWatcher) waitForAcmeChallenge(ctx context.Context, namespace st
 			case watch.Added, watch.Modified:
 				// Check if the updated ingress contains the ACME challenge.
 				ing, ok := event.Object.(*networkingv1.Ingress)
-				if ok && containsAcmeChallenge(ctx, ing) {
+				if ok && isContainsAcmeChallenge(ctx, ing) {
 					return nil
 				}
 			case watch.Deleted:
