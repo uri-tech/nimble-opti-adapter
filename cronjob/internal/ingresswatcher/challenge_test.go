@@ -70,7 +70,7 @@ func TestWaitForChallengeAbsence(t *testing.T) {
 				resultCh <- res
 			}()
 
-			time.Sleep(5 * time.Second)
+			time.Sleep(2 * time.Second)
 
 			// Update the ingress with the final paths.
 			ing.Spec.Rules = createIngressRules(tt.finalPaths)
@@ -96,7 +96,6 @@ func TestWaitForChallengeAbsence(t *testing.T) {
 	}
 }
 
-//
 //
 //
 //

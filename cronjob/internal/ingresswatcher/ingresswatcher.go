@@ -30,7 +30,7 @@ type IngressWatcher struct {
 }
 
 // logger is the logger for the ingresswatcher package.
-var logger = loggerpkg.GetNamedLogger("ingresswatcher").WithOptions()
+var logger = loggerpkg.GetNamedLogger("ingresswatcher")
 
 // func NewIngressWatcher(clientKube *kubernetes.Clientset, ecfg *configenv.ConfigEnv) (*IngressWatcher, error) {
 func NewIngressWatcher(clientKube kubernetes.Interface, ecfg *configenv.ConfigEnv) (*IngressWatcher, error) {
@@ -69,8 +69,8 @@ func NewIngressWatcher(clientKube kubernetes.Interface, ecfg *configenv.ConfigEn
 
 	// Create a new client to Kubernetes API.
 	cl, err := client.New(cfg, client.Options{
-		Cache:  nil,
 		Scheme: scheme,
+		Cache:  nil,
 		Mapper: mapper,
 	})
 	if err != nil {

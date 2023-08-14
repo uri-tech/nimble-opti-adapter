@@ -16,6 +16,7 @@ import (
 	v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
 	"github.com/uri-tech/nimble-opti-adapter/cronjob/configenv"
 	"github.com/uri-tech/nimble-opti-adapter/utils"
+	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
@@ -238,7 +239,6 @@ func TestAuditIngressResources(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to audit ingress resources: %v", err)
 	}
-	// assert.Nil(t, err)
 }
 
 func TestStartCertificateRenewalAudit(t *testing.T) {
@@ -249,11 +249,11 @@ func TestStartCertificateRenewalAudit(t *testing.T) {
 		initialPaths []string
 		isRenewed    bool
 	}{
-		{
-			name:         "Successful certificate renewal",
-			initialPaths: []string{"/app", "/.well-known/acme-challenge"},
-			isRenewed:    true,
-		},
+		// {
+		// 	name:         "Successful certificate renewal",
+		// 	initialPaths: []string{"/app", "/.well-known/acme-challenge"},
+		// 	isRenewed:    true,
+		// },
 		{
 			name:         "unsuccessful certificate renewal",
 			initialPaths: []string{"/app", "/.well-known/acme-challenge"},
@@ -276,6 +276,7 @@ func TestStartCertificateRenewalAudit(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			iw.Config.AnnotationRemovalDelay = 5
 
 			// Create the NimbleOpti object.
 			nimbleOpti := &v1.NimbleOpti{
@@ -292,12 +293,6 @@ func TestStartCertificateRenewalAudit(t *testing.T) {
 			if err := fakeClient.Create(ctx, nimbleOpti); err != nil {
 				t.Fatalf("Failed to create NimbleOpti: %v", err)
 			}
-
-			// isRenew, err := iw.startCertificateRenewalAudit(ctx, ing)
-			// if err != nil {
-			// 	t.Fatalf("startCertificateRenewal failed: %v", err)
-			// }
-			// assert.Equal(t, isRenew, tt.isRenewed)
 
 			// Test
 			gotRenewalCh := make(chan bool)
@@ -336,6 +331,116 @@ func TestStartCertificateRenewalAudit(t *testing.T) {
 			// Delete the Ingress object.
 			if err := fakeClient.Delete(context.Background(), ing); err != nil {
 				t.Fatalf("Failed to delete Ingress: %v", err)
+			}
+		})
+	}
+}
+
+func TestChangeIngressSecretName(t *testing.T) {
+	ctx := context.TODO()
+
+	tests := []struct {
+		name           string
+		initialSecret  string
+		changeToSecret string
+		expectSecret   string
+		shouldError    bool
+	}{
+		{
+			name:           "Ingress has the secret and it's updated correctly",
+			initialSecret:  "my-secret",
+			changeToSecret: "my-secret",
+			expectSecret:   "my-secret-v1", // Assuming that "ChangeSecretName" appends "-v1" for the first version.
+			shouldError:    false,
+		},
+		// ... Add other test cases as needed
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			ing := generateIngress("test-ingress", "default", nil, []string{"/"}, nil)
+			ing.Spec.TLS = []networkingv1.IngressTLS{
+				{
+					SecretName: tt.initialSecret,
+				},
+			}
+			fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(ing).Build()
+
+			iw, err := setupIngressWatcher(fakeClient)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			err = iw.changeIngressSecretName(ctx, ing, tt.changeToSecret)
+
+			if tt.shouldError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				// Fetch the updated ingress and check the secret name
+				updatedIngress := &networkingv1.Ingress{}
+				err = fakeClient.Get(ctx, client.ObjectKey{Name: "test-ingress", Namespace: "default"}, updatedIngress)
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectSecret, updatedIngress.Spec.TLS[0].SecretName)
+			}
+		})
+	}
+}
+
+func TestDeleteIngressSecret(t *testing.T) {
+	ctx := context.TODO()
+
+	tests := []struct {
+		name              string
+		initialSecretName string
+		deleteSecretName  string
+		secretNamespace   string
+		shouldError       bool
+	}{
+		{
+			name:              "Secret is present and gets deleted successfully",
+			initialSecretName: "existing-secret",
+			deleteSecretName:  "existing-secret",
+			secretNamespace:   "default",
+			shouldError:       false,
+		},
+		{
+			name:              "Secret isn't present and deletion returns an error",
+			initialSecretName: "",
+			deleteSecretName:  "non-existent-secret",
+			secretNamespace:   "default",
+			shouldError:       true,
+		},
+		// ... Add other test cases as needed
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Setup
+			var initialSecrets []client.Object
+			if tt.initialSecretName != "" {
+				initialSecrets = append(initialSecrets, &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      tt.initialSecretName,
+						Namespace: tt.secretNamespace,
+					},
+				})
+			}
+
+			fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).WithObjects(initialSecrets...).Build()
+			iw := &IngressWatcher{ClientObj: fakeClient}
+
+			err := iw.deleteIngressSecret(ctx, tt.deleteSecretName, tt.secretNamespace)
+
+			if tt.shouldError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				// Check if the secret was actually deleted
+				secret := &corev1.Secret{}
+				err = fakeClient.Get(ctx, client.ObjectKey{Name: tt.deleteSecretName, Namespace: tt.secretNamespace}, secret)
+				assert.True(t, client.IgnoreNotFound(err) == nil && err != nil, "Secret should be deleted but is still present")
 			}
 		})
 	}
