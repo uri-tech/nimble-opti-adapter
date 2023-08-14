@@ -25,7 +25,7 @@ This function is the heart of our watcher. 💓 It's like a diligent detective, 
   - The function calculates the remaining validity duration of the certificate.
   - Based on the remaining time and user permissions:
     - **Administrator Access** (`ADMIN_USER_PERMISSION: "true"`): The function deletes the corresponding Ingress secret, facilitating the generation of a new one.
-    - **Standard User Access** (`ADMIN_USER_PERMISSION: "false"`): The function modifies the name of the secret, prompting the cert-manager to produce a new certificate.
+    - **Standard User Access** (`ADMIN_USER_PERMISSION: "false"`): Doing nothing for now.
 
 **Summary**: At the conclusion of its operations, `AuditIngressResources` logs the total count of audited Ingress resources, ensuring comprehensive oversight and management.
 

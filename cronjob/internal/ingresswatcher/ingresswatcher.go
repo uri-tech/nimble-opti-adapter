@@ -3,7 +3,6 @@ package ingresswatcher
 import (
 	"context"
 	"errors"
-	"net/http"
 	"time"
 
 	v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
@@ -18,7 +17,6 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
@@ -56,22 +54,22 @@ func NewIngressWatcher(clientKube kubernetes.Interface, ecfg *configenv.ConfigEn
 		return nil, err
 	}
 
-	// Create a new dynamic RESTMapper. The RESTMapper is responsible for converting
-	// group, version, and kind information to and from resource paths and scopes.
-	// A dynamic RESTMapper can update itself automatically when new API types are registered.
-	// 'cfg' provides the connection configuration to the Kubernetes cluster, and
-	// 'http.DefaultClient' is the default HTTP client used for making API requests.
-	mapper, err := apiutil.NewDynamicRESTMapper(cfg, http.DefaultClient)
-	if err != nil {
-		logger.Fatalf("unable to create RESTMapper: %v", err)
-		return nil, err
-	}
+	// // Create a new dynamic RESTMapper. The RESTMapper is responsible for converting
+	// // group, version, and kind information to and from resource paths and scopes.
+	// // A dynamic RESTMapper can update itself automatically when new API types are registered.
+	// // 'cfg' provides the connection configuration to the Kubernetes cluster, and
+	// // 'http.DefaultClient' is the default HTTP client used for making API requests.
+	// mapper, err := apiutil.NewDynamicRESTMapper(cfg, http.DefaultClient)
+	// if err != nil {
+	// 	logger.Fatalf("unable to create RESTMapper: %v", err)
+	// 	return nil, err
+	// }
 
 	// Create a new client to Kubernetes API.
 	cl, err := client.New(cfg, client.Options{
 		Scheme: scheme,
 		Cache:  nil,
-		Mapper: mapper,
+		// Mapper: mapper,
 	})
 	if err != nil {
 		logger.Fatalf("unable to create client %v", err)
