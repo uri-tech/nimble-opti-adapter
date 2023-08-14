@@ -19,15 +19,28 @@ This function is the constructor for the `IngressWatcher` type. It's like the bi
 ### `AuditIngressResources`
 This function is the heart of our watcher. 💓 It's like a diligent detective, scanning through all Ingress resources in the cluster. For each Ingress:
 
-- **ACME Challenge Presence**: If the Ingress is associated with an ACME challenge, the function initiates the certificate renewal process.
+- **Presence of ACME Challenge**: 
+  - If the Ingress has an ACME challenge path, the function will:
+    1. Initiate the certificate renewal process.
+    2. If the certificate is not renewed:
+       - Try changing the secret name associated with the Ingress to prompt the `cert-manager` to create a new certificate.
+       - If the certificate is still not renewed after changing the secret name, log the old and new secret names.
+       - If the certificate is successfully renewed after changing the secret name, log the success.
+  
+- **Absence of ACME Challenge and Admin User Permission**: 
+  - If there's no ACME challenge path but the function has admin user permissions:
+    1. Calculate the time remaining before the certificate is due for renewal.
+    2. If the remaining time is less than or equal to the defined threshold:
+       - Delete the associated Ingress secret and wait for 5 seconds to ensure the secret has been deleted.
+       - Attempt to renew the certificate.
+       - If the certificate is renewed successfully, log the success. Otherwise, indicate that the certificate is not yet due for renewal.
 
-- **Absence of ACME Challenge**: In cases where there's no ACME challenge:
-  - The function calculates the remaining validity duration of the certificate.
-  - Based on the remaining time and user permissions:
-    - **Administrator Access** (`ADMIN_USER_PERMISSION: "true"`): The function deletes the corresponding Ingress secret, facilitating the generation of a new one.
-    - **Standard User Access** (`ADMIN_USER_PERMISSION: "false"`): Doing nothing for now.
+**Summary**: At the end of its operations, `AuditIngressResources` provides logs detailing:
+- The total number of Ingress resources audited.
+- The number of Ingress resources that required renewal.
+- The number that were successfully renewed.
 
-**Summary**: At the conclusion of its operations, `AuditIngressResources` logs the total count of audited Ingress resources, ensuring comprehensive oversight and management.
+This ensures a comprehensive overview and management of the Ingress resources.
 
 
 ### `startCertificateRenewalAudit`

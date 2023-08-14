@@ -84,7 +84,7 @@ func NewIngressWatcher(clientKube kubernetes.Interface, ecfg *configenv.ConfigEn
 	}, nil
 }
 
-// auditIngressResources audits all Ingress with the label "nimble.opti.adapter/enabled:true".
+// auditIngressResources audits all Ingress with the label. renew the certificate if needed.
 func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) error {
 	logger.Debug("starting AuditIngressResources")
 
@@ -106,7 +106,7 @@ func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) error {
 
 	// Iterate through all Ingress resources
 	for _, ing := range ingresses.Items {
-		// check if the ingress is labeled with the label "nimble.opti.adapter/enabled:true"
+		// check if the ingress has any ACME challenge paths.
 		if isContainsAcmeChallenge(ctx, &ing) {
 			countIngressForRenewal++
 			logger.Infof("Found ingress with ACME challenge path, ingress name: %v", ing.Name)
@@ -125,6 +125,7 @@ func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) error {
 					logger.Errorf("Failed to change ingress secret name: %v", err)
 					return err
 				}
+				// start certificate renewal by make sure letsencrypt can reach the ACME challenge path.
 				isSecondTeyRenew, err := iw.startCertificateRenewalAudit(ctx, &ing)
 				if err != nil {
 					logger.Errorf("Failed to start certificate renewal: %v", err)
@@ -140,14 +141,14 @@ func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) error {
 				countIngressRenewed++
 				logger.Infof("Certificate was renewed, ingress name: %v", ing.Name)
 			}
-		} else if iw.Config.AdminUserPermission {
-			// Calculate the time remaining for renewal
+		} else if iw.Config.AdminUserPermission { // check if the cronjob has admin user permission for reading secrets.
+			// Calculate the time remaining for renewal.
 			timeRemaining, secretName, err := iw.timeRemainingCertificateUpToRenewal(ctx, &ing)
 			if err != nil {
 				logger.Errorf("Failed to check if the certificate is up to renewal: %v", err)
 				return err
 			}
-			// Check if the certificate is up to renewal
+			// Check if the certificate is up to renewal.
 			if timeRemaining <= time.Duration(iw.Config.CertificateRenewalThreshold*24)*time.Hour {
 
 				// delete connected ingress secret
@@ -159,7 +160,7 @@ func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) error {
 				// sleep for 5 seconds for make sure the secret was deleted
 				time.Sleep(5 * time.Second)
 
-				// start certificate renewal
+				// start certificate renewal by make sure letsencrypt can reach the ACME challenge path.
 				isRenew, err := iw.startCertificateRenewalAudit(ctx, &ing)
 				if err != nil {
 					logger.Errorf("Failed to start certificate renewal: %v", err)
