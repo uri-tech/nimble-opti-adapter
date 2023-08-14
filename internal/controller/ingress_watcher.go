@@ -14,6 +14,7 @@ import (
 
 	v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
 	metrics "github.com/uri-tech/nimble-opti-adapter/metrics"
+	"github.com/uri-tech/nimble-opti-adapter/utils"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 
@@ -41,7 +42,7 @@ type IngressWatcher struct {
 	Client          KubernetesClient
 	IngressInformer cache.SharedIndexInformer
 	ClientObj       client.Client
-	auditMutex      *NamedMutex
+	auditMutex      *utils.NamedMutex
 	Queue           workqueue.RateLimitingInterface
 }
 
@@ -109,7 +110,7 @@ func NewIngressWatcher(clientKube kubernetes.Interface, stopCh <-chan struct{}) 
 	iw := &IngressWatcher{
 		Client:     &RealKubernetesClient{clientKube},
 		ClientObj:  cl,
-		auditMutex: NewNamedMutex(),
+		auditMutex: utils.NewNamedMutex(),
 		Queue:      workqueue.NewNamedRateLimitingQueue(workqueue.DefaultControllerRateLimiter(), "IngressQueue"),
 	}
 

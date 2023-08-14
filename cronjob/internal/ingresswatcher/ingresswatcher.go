@@ -7,8 +7,8 @@ import (
 
 	v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
 	"github.com/uri-tech/nimble-opti-adapter/cronjob/configenv"
-	"github.com/uri-tech/nimble-opti-adapter/cronjob/internal/utils"
 	"github.com/uri-tech/nimble-opti-adapter/cronjob/loggerpkg"
+	"github.com/uri-tech/nimble-opti-adapter/utils"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

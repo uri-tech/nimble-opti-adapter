@@ -19,12 +19,16 @@ This function is the constructor for the `IngressWatcher` type. It's like the bi
 ### `AuditIngressResources`
 This function is the heart of our watcher. 💓 It's like a diligent detective, scanning through all Ingress resources in the cluster. For each Ingress:
 
-1. If the Ingress is labeled with `"nimble.opti.adapter/enabled:true"` and contains the ACME challenge, it initiates the certificate renewal process.
-2. If not, it calculates the time remaining for the certificate's renewal. If the certificate is nearing its expiration:
-   - For users with admin permissions (`ADMIN_USER_PERMISSION: "true"`), it deletes the associated Ingress secret.
-   - For other users (`ADMIN_USER_PERMISSION: "false"`), it changes the secret's name to prompt the cert-manager to create a new certificate.
-   
-After all the checks and actions, it logs the number of Ingress resources it audited.
+- **ACME Challenge Presence**: If the Ingress is associated with an ACME challenge, the function initiates the certificate renewal process.
+
+- **Absence of ACME Challenge**: In cases where there's no ACME challenge:
+  - The function calculates the remaining validity duration of the certificate.
+  - Based on the remaining time and user permissions:
+    - **Administrator Access** (`ADMIN_USER_PERMISSION: "true"`): The function deletes the corresponding Ingress secret, facilitating the generation of a new one.
+    - **Standard User Access** (`ADMIN_USER_PERMISSION: "false"`): The function modifies the name of the secret, prompting the cert-manager to produce a new certificate.
+
+**Summary**: At the conclusion of its operations, `AuditIngressResources` logs the total count of audited Ingress resources, ensuring comprehensive oversight and management.
+
 
 ### `startCertificateRenewalAudit`
 This function is the certificate's guardian. 🛡️ When an Ingress contains the `.well-known/acme-challenge`, this function steps in to renew the certificate. It:

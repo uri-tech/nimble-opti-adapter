@@ -17,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
+	"github.com/uri-tech/nimble-opti-adapter/utils"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,7 +82,7 @@ func setupIngressWatcherMock(clientObj client.Client, client *FakeKubernetesClie
 	// Set the client object.
 	iw.ClientObj = clientObj
 	// Set the audit mutex.
-	iw.auditMutex = NewNamedMutex()
+	iw.auditMutex = utils.NewNamedMutex()
 	// Set the fake Kubernetes client.
 	iw.Client = client
 
@@ -105,7 +106,7 @@ func setupIngressWatcher(client client.Client) (*IngressWatcher, error) {
 		return nil, err
 	}
 	iw.ClientObj = client
-	iw.auditMutex = NewNamedMutex()
+	iw.auditMutex = utils.NewNamedMutex()
 
 	return iw, nil
 }

@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/uri-tech/nimble-opti-adapter/cronjob/internal/utils"
+	"github.com/uri-tech/nimble-opti-adapter/utils"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	// _ "github.com/uri-tech/nimble-opti-adapter/cronjob/loggerpkg"

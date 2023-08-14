@@ -27,7 +27,7 @@ image_tag="${IMAGE_TAG:-v1.0.0}"
 docker_image_name="${DOCKER_IMAGE_NAME:-${docker_username}/cronjob-n-o-a}"
 build_platform="${BUILD_PLATFORM:-local}" # local or all
 admin_config="${ADMIN_CONFIG:-false}"
-testCode="${TEST_CODE:-false}" # true or false
+testCode="${TEST_CODE:-true}" # true or false
 
 # Run Go tests
 if [ "$testCode" = "true" ]; then

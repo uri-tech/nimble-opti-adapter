@@ -4,22 +4,21 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/uri-tech/nimble-opti-adapter/cronjob/loggerpkg"
 	networkingv1 "k8s.io/api/networking/v1"
 )
 
-var logger = loggerpkg.GetNamedLogger("ingresswatcher")
+// var logger = loggerpkg.GetNamedLogger("ingresswatcher")
 
 // common way to do create unique key in Kubernetes - use the namespace and the name of the resource, joined by a delimiter. it's like cache.MetaNamespaceKeyFunc(obj).
 func IngressKey(ing *networkingv1.Ingress) string {
-	logger.Debug("ingressKey")
+	// logger.Debug("ingressKey")
 
 	return ing.Namespace + "/" + ing.Name
 }
 
 // ChangeSecretName check if the name has "-vX" suffix for example (-v1), if not - add it. if it have - change it to "-vX+1".
 func ChangeSecretName(secretName string) (string, error) {
-	logger.Debug("checkAndChangeSecretName")
+	// logger.Debug("checkAndChangeSecretName")
 
 	if !isStrHasVxSuffix(secretName) {
 		// add "-vX" suffix to secret name
@@ -28,7 +27,7 @@ func ChangeSecretName(secretName string) (string, error) {
 		// change "-vX" suffix to "-vX+1" suffix
 		newSecretName, err := IncVxSuffixToStr(secretName)
 		if err != nil {
-			logger.Errorf("Failed to increment secret name suffix: %v", err)
+			// logger.Errorf("Failed to increment secret name suffix: %v", err)
 			return "", err
 		}
 		return newSecretName, nil
@@ -37,7 +36,7 @@ func ChangeSecretName(secretName string) (string, error) {
 
 // check if the string has the suffix "-vX" in its last part, for example: "my-secret-v1"
 func isStrHasVxSuffix(str string) bool {
-	logger.Debug("isStrHasVxSuffix")
+	// logger.Debug("isStrHasVxSuffix")
 
 	// split the string to parts by "-"
 	strParts := strings.Split(str, "-")
@@ -56,14 +55,14 @@ func isStrHasVxSuffix(str string) bool {
 
 // add "-vX" suffix to string name
 func AddVxSuffixToStr(str string) string {
-	logger.Debug("AddVxSuffixToStr")
+	// logger.Debug("AddVxSuffixToStr")
 
 	return str + "-v1"
 }
 
 // change "-vX" suffix to "-vX+1" suffix
 func IncVxSuffixToStr(str string) (string, error) {
-	logger.Debug("IncVxSuffixToStr")
+	// logger.Debug("IncVxSuffixToStr")
 
 	// split the string to parts by "-"
 	strParts := strings.Split(str, "-")
@@ -74,7 +73,7 @@ func IncVxSuffixToStr(str string) (string, error) {
 	// convert the last part to int
 	strPartsVInt, err := strconv.Atoi(strPartsV)
 	if err != nil {
-		logger.Errorf("Failed to convert string to int: %v", err)
+		// logger.Errorf("Failed to convert string to int: %v", err)
 		return "", err
 	}
 
