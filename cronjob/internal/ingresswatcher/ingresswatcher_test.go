@@ -329,7 +329,7 @@ func TestStartCertificateRenewalAudit(t *testing.T) {
 				assert.Equal(t, tt.isRenewed, gotRenewal)
 			case err := <-errorCh:
 				t.Fatalf("Received error: %v", err)
-			case <-time.After(20 * time.Second): // Adjust as needed
+			case <-time.After(60 * time.Second): // Adjust as needed
 				t.Fatal("Timeout while waiting for processIngressForRenewal response")
 			}
 

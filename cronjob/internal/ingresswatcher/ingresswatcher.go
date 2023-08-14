@@ -28,7 +28,7 @@ type IngressWatcher struct {
 }
 
 // logger is the logger for the ingresswatcher package.
-var logger = loggerpkg.GetNamedLogger("ingresswatcher")
+var logger = loggerpkg.GetNamedLogger("ingresswatcher").WithOptions()
 
 // func NewIngressWatcher(clientKube *kubernetes.Clientset, ecfg *configenv.ConfigEnv) (*IngressWatcher, error) {
 func NewIngressWatcher(clientKube kubernetes.Interface, ecfg *configenv.ConfigEnv) (*IngressWatcher, error) {
@@ -76,6 +76,11 @@ func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) error {
 	// debug
 	logger.Debug("AuditIngressResources")
 
+	// initialize the IngressForRenewal struct
+	countIngressForRenewal := 0
+	// count the ingress that was successfully renewed
+	countIngressRenewed := 0
+
 	// Fetch all Ingress resources
 	ingresses := &networkingv1.IngressList{}
 
@@ -91,13 +96,25 @@ func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) error {
 	for _, ing := range ingresses.Items {
 		// check if the ingress is labeled with the label "nimble.opti.adapter/enabled:true"
 		if isContainsAcmeChallenge(ctx, &ing) {
+			countIngressForRenewal++
+			logger.Infof("Found ingress with ACME challenge path, ingress name: %v", ing.Name)
 			// start certificate renewal
-			_, err := iw.startCertificateRenewalAudit(ctx, &ing)
+			isRenew, err := iw.startCertificateRenewalAudit(ctx, &ing)
 			if err != nil {
 				logger.Errorf("Failed to start certificate renewal: %v", err)
 				return err
 			}
-		} else {
+			if !isRenew {
+				// change the connected ingress secret in ing.Spec.TLS for make cert-manager create new certificate secret.
+				if err := iw.changeIngressSecretName(ctx, &ing, ing.Spec.TLS[0].SecretName); err != nil {
+					logger.Errorf("Failed to delete ingress secret: %v", err)
+					return err
+				}
+			} else {
+				countIngressRenewed++
+				logger.Infof("Certificate was renewed, ingress name: %v", ing.Name)
+			}
+		} else if iw.Config.AdminUserPermission {
 			// Calculate the time remaining for renewal
 			timeRemaining, secretName, err := iw.timeRemainingCertificateUpToRenewal(ctx, &ing)
 			if err != nil {
@@ -106,22 +123,16 @@ func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) error {
 			}
 			// Check if the certificate is up to renewal
 			if timeRemaining <= time.Duration(iw.Config.CertificateRenewalThreshold*24)*time.Hour {
-				if iw.Config.AdminUserPermission {
-					// delete connected ingress secret
-					if err := iw.deleteIngressSecret(ctx, ing.Spec.TLS[0].SecretName, ing.Namespace); err != nil {
-						logger.Errorf("Failed to delete ingress secret: %v", err)
-						return err
-					}
 
-					// sleep for 5 seconds for make sure the secret was deleted
-					time.Sleep(5 * time.Second)
-				} else {
-					// change the connected ingress secret in ing.Spec.TLS for make cert-manager create new certificate secret.
-					if err := iw.changeIngressSecretName(ctx, &ing, secretName); err != nil {
-						logger.Errorf("Failed to delete ingress secret: %v", err)
-						return err
-					}
+				// delete connected ingress secret
+				if err := iw.deleteIngressSecret(ctx, secretName, ing.Namespace); err != nil {
+					logger.Errorf("Failed to delete ingress secret: %v", err)
+					return err
 				}
+
+				// sleep for 5 seconds for make sure the secret was deleted
+				time.Sleep(5 * time.Second)
+
 				// start certificate renewal
 				isRenew, err := iw.startCertificateRenewalAudit(ctx, &ing)
 				if err != nil {
@@ -136,7 +147,8 @@ func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) error {
 			}
 		}
 	}
-	logger.Infof("Finished auditing %d Ingress resources", len(ingresses.Items))
+	logger.Infof("Finished auditing %d Ingress resources. There was %d ingress needed renewal", len(ingresses.Items), countIngressForRenewal)
+	logger.Infof("There was %d ingress successfully renewed", countIngressRenewed)
 
 	return nil
 }
@@ -181,8 +193,9 @@ func (iw *IngressWatcher) changeIngressSecretName(ctx context.Context, ing *netw
 	logger.Debug("changeIngressSecretName")
 
 	// Iterate over spec.tls[] to fetch associated secrets
-	for _, tlsSpec := range ing.Spec.TLS {
-		if tlsSpec.SecretName == secretName {
+	idxName := 0
+	for i := range ing.Spec.TLS {
+		if ing.Spec.TLS[i].SecretName == secretName {
 			// check if the name has "-vX" suffix for example (-v1), if not - add it. if it have - change it to "-vX+1".
 			newSecretName, err := utils.ChangeSecretName(secretName)
 			if err != nil {
@@ -191,7 +204,8 @@ func (iw *IngressWatcher) changeIngressSecretName(ctx context.Context, ing *netw
 			}
 
 			// Change secret name the it name + "-v(X+1))"
-			tlsSpec.SecretName = newSecretName
+			ing.Spec.TLS[i].SecretName = newSecretName
+			idxName = i
 			break
 		}
 	}
@@ -209,6 +223,8 @@ func (iw *IngressWatcher) changeIngressSecretName(ctx context.Context, ing *netw
 			logger.Error("Unable to change ingress secret name: ", err)
 			return err
 		}
+
+		logger.Infof("Change ingress secret name to %s", ing.Spec.TLS[idxName].SecretName)
 	} else {
 		errMassage := "key " + key + " is locked, and it should be unlocked"
 		logger.Errorf(errMassage)

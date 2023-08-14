@@ -20,7 +20,7 @@ func LoadConfig() (*ConfigEnv, error) {
 	cfg := &ConfigEnv{
 		RunMode:                     getEnv("RUN_MODE", "dev"),
 		CertificateRenewalThreshold: getEnvAsInt("CERTIFICATE_RENEWAL_THRESHOLD", 60),
-		AnnotationRemovalDelay:      getEnvAsInt("ANNOTATION_REMOVAL_DELAY", 10),
+		AnnotationRemovalDelay:      getEnvAsInt("ANNOTATION_REMOVAL_DELAY", 30),
 		AdminUserPermission:         getEnv("ADMIN_USER_PERMISSION", "false") == "true",
 		LogOutput:                   getEnv("LOG_OUTPUT", "console"),
 	}

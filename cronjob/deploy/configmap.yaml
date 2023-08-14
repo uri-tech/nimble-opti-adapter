@@ -9,7 +9,7 @@ data:
   RUN_MODE: "dev" # dev or prod.
   LOG_OUTPUT: "console" # console or json.
   CERTIFICATE_RENEWAL_THRESHOLD: "60" # in days.
-  ANNOTATION_REMOVAL_DELAY: "10" # in seconds.
+  ANNOTATION_REMOVAL_DELAY: "30" # in seconds.
   ADMIN_USER_PERMISSION: "false" # "true" or "false" - read and delete secrets.
 ---
 

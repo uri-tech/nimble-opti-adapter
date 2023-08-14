@@ -35,16 +35,20 @@ func ChangeSecretName(secretName string) (string, error) {
 	}
 }
 
-// check if the string contain the substring "-vX" in it last part, for example: "my-secret-v1"
+// check if the string has the suffix "-vX" in its last part, for example: "my-secret-v1"
 func isStrHasVxSuffix(str string) bool {
 	logger.Debug("isStrHasVxSuffix")
 
 	// split the string to parts by "-"
 	strParts := strings.Split(str, "-")
 
-	// check if the last part contain the substring "-vX"
-	if strings.Contains(strParts[len(strParts)-1], "-v") {
-		return true
+	// get the last part
+	lastPart := strParts[len(strParts)-1]
+
+	// check if the last part starts with "v" and the rest is a number
+	if strings.HasPrefix(lastPart, "v") {
+		_, err := strconv.Atoi(lastPart[1:])
+		return err == nil
 	}
 
 	return false

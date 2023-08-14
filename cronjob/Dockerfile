@@ -32,15 +32,15 @@ RUN mkdir -p /myapp/src
 # Install required packages for running the application. --no-cache option to avoid creating a cache in the Docker image.
 RUN apk add --no-cache ca-certificates
 
-# # Create a non-root user to run the application
-# RUN adduser -D -g '' appuser
+# Create a non-root user to run the application
+RUN adduser -D -g '' appuser
 
 # Remove unnecessary packages
 RUN rm -rf /var/cache/*
 # RUN apk del openssh-client && rm -rf /var/cache/apk/*
 
-# # run the app as non-root user
-# USER appuser
+# run the app as non-root user
+USER appuser
 
 # Set the working directory and copy the binary from the builder stage
 WORKDIR /myapp
