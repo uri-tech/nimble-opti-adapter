@@ -7,6 +7,8 @@ metadata:
   namespace: ingress-modify-ns
 spec:
   schedule: "0 0 * * *" # This schedule is set to run once a day at midnight
+  successfulJobsHistoryLimit: 7 # Keep only the last 7 successful jobs
+  failedJobsHistoryLimit: 7 # Keep only the last 7 failed jobs
   jobTemplate:
     spec:
       template:
