@@ -70,7 +70,7 @@ func TestWaitForChallengeAbsence(t *testing.T) {
 				resultCh <- res
 			}()
 
-			time.Sleep(2 * time.Second)
+			time.Sleep(5 * time.Second)
 
 			// Update the ingress with the final paths.
 			ing.Spec.Rules = createIngressRules(tt.finalPaths)
@@ -95,3 +95,101 @@ func TestWaitForChallengeAbsence(t *testing.T) {
 		})
 	}
 }
+
+//
+//
+//
+//
+
+// func TestWaitForChallengeAbsenceNew(t *testing.T) {
+// 	ctx := context.TODO()
+
+// 	tests := []struct {
+// 		name              string
+// 		initialPaths      []string
+// 		finalPaths        []string
+// 		expectPathAbsence bool // true means we expect the path to be absent at the end of the test
+// 	}{
+// 		{
+// 			name:              "Path removed within the timeout duration",
+// 			initialPaths:      []string{"/app", "/.well-known/acme-challenge"},
+// 			finalPaths:        []string{"/app"},
+// 			expectPathAbsence: true,
+// 		},
+// 		// Uncomment and use this test when required.
+// 		// {
+// 		// 	name:              "Path persists beyond the timeout duration",
+// 		// 	initialPaths:      []string{"/app", "/.well-known/acme-challenge"},
+// 		// 	finalPaths:        []string{"/app", "/.well-known/acme-challenge"},
+// 		// 	expectPathAbsence: false,
+// 		// },
+// 	}
+
+// 	for _, tt := range tests {
+// 		t.Run(tt.name, func(t *testing.T) {
+// 			// Setup the fake client.
+// 			fakeClient := fakec.NewClientBuilder().WithScheme(scheme.Scheme).Build()
+
+// 			// Create the IngressWatcher using the fake client.
+// 			iw, err := setupIngressWatcher(fakeClient)
+// 			if err != nil {
+// 				t.Fatal(err)
+// 			}
+
+// 			// Create the initial ingress using the IngressWatcher's client.
+// 			ing := generateIngress("test-ingress", "default", nil, tt.initialPaths, nil)
+// 			if err := iw.ClientObj.Create(ctx, ing); err != nil {
+// 				t.Fatalf("Failed to create initial ingress: %v", err)
+// 			}
+
+// 			// Run the function being tested in a separate goroutine.
+// 			timeout := 10 * time.Second
+// 			resultCh := make(chan time.Duration)
+// 			errorCh := make(chan error)
+// 			go func() {
+// 				res, err := iw.waitForChallengeAbsenceNew(ctx, timeout, "default", "test-ingress")
+// 				if err != nil {
+// 					errorCh <- err
+// 					return
+// 				}
+// 				resultCh <- res
+// 			}()
+
+// 			// Simulate a delay before updating the ingress.
+// 			time.Sleep(2 * time.Second)
+
+// 			// Fetch the current version of the ingress using the IngressWatcher's client.
+// 			currentIngress := &networkingv1.Ingress{}
+// 			err = iw.ClientObj.Get(ctx, client.ObjectKey{Name: "test-ingress", Namespace: "default"}, currentIngress)
+// 			if err != nil {
+// 				t.Fatalf("Failed to get current ingress: %v", err)
+// 			}
+
+// 			// Modify the current ingress with the desired paths.
+// 			currentIngress.Spec.Rules = generateIngressRules(tt.finalPaths)
+
+// 			// Update the ingress using the IngressWatcher's client.
+// 			if err := iw.ClientObj.Update(ctx, currentIngress); err != nil {
+// 				t.Fatalf("Failed to update ingress: %v", err)
+// 			}
+
+// 			// Assertions
+// 			select {
+// 			case err := <-errorCh:
+// 				t.Fatalf("Error from waitForChallengeAbsence: %v", err)
+// 			case res := <-resultCh:
+// 				if tt.expectPathAbsence {
+// 					if res >= timeout {
+// 						t.Fatalf("Expected ACME challenge path to be absent before timeout, but it wasn't")
+// 					}
+// 				} else {
+// 					if res < timeout {
+// 						t.Fatalf("Expected ACME challenge path to still be present, but it was absent")
+// 					}
+// 				}
+// 			case <-time.After(timeout + 1*time.Second):
+// 				t.Fatal("Test timeout exceeded")
+// 			}
+// 		})
+// 	}
+// }

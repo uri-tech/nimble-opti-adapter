@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -12,13 +13,14 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
+	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // waitForChallengeAbsence waits for the absence of the ACME challenge path in the Ingress or until a timeout is reached.
 // Returns the time it took to renew(timeout*2 when it failed) or there is an error.
 func (iw *IngressWatcher) waitForChallengeAbsence(ctx context.Context, timeout time.Duration, ingNamespace, ingName string) (time.Duration, error) {
-	logger.Debug("waitForChallengeAbsence")
+	logger.Debugf("starting waitForChallengeAbsence, timeout: %v, ingNamespace: %v, ingName: %v", timeout, ingNamespace, ingName)
 
 	// Capture the start time
 	startTime := time.Now()
@@ -74,7 +76,7 @@ func (iw *IngressWatcher) waitForChallengeAbsence(ctx context.Context, timeout t
 
 // isContainsAcmeChallenge checks if the given ingress contains any ACME challenge paths.
 func isContainsAcmeChallenge(ctx context.Context, ing *networkingv1.Ingress) bool {
-	logger.Debug("isContainsAcmeChallenge")
+	logger.Debugf("starting isContainsAcmeChallenge, ingress: %v", ing.Name)
 
 	for _, rule := range ing.Spec.Rules {
 		for _, path := range rule.IngressRuleValue.HTTP.Paths {
@@ -89,7 +91,7 @@ func isContainsAcmeChallenge(ctx context.Context, ing *networkingv1.Ingress) boo
 
 // isAcmeChallengePath checks if the given path contains the ACME challenge string.
 func isAcmeChallengePath(ctx context.Context, p string) bool {
-	logger.Debug("isAcmeChallengePath")
+	logger.Debugf("starting isAcmeChallengePath, path: %v", p)
 
 	const acmeChallengePath = ".well-known/acme-challenge"
 
@@ -98,7 +100,7 @@ func isAcmeChallengePath(ctx context.Context, p string) bool {
 
 // timeRemainingCertificateUpToRenewal return the certificate time remaining for renewal and the secret name.
 func (iw *IngressWatcher) timeRemainingCertificateUpToRenewal(ctx context.Context, ing *networkingv1.Ingress) (time.Duration, string, error) {
-	logger.Debug("timeRemainingCertificateUpToRenewal")
+	logger.Debugf("starting timeRemainingCertificateUpToRenewal, ingress: %v", ing.Name)
 
 	// Iterate over spec.tls[] to fetch associated secrets
 	for _, tlsSpec := range ing.Spec.TLS {
@@ -152,4 +154,62 @@ func (iw *IngressWatcher) timeRemainingCertificateUpToRenewal(ctx context.Contex
 	}
 
 	return 0, "", nil
+}
+
+// waitForChallengeAbsence waits for the ACME challenge path to be removed from the Ingress.
+// It will watch for modifications to the Ingress and will return once the ACME challenge is absent.
+// It returns the time it took to detect the removal (or timeout*2 if a timeout or error occurred).
+func (iw *IngressWatcher) waitForChallengeAbsenceNew(ctx context.Context, timeout time.Duration, ingNamespace, ingName string) (time.Duration, error) {
+	logger.Debugf("starting waitForChallengeAbsence, timeout: %v, ingNamespace: %v, ingName: %v", timeout, ingNamespace, ingName)
+
+	// Capture the start time to calculate the elapsed time later.
+	startTime := time.Now()
+
+	// Start watching the specified ingress for changes.
+	// Ensure the associated ServiceAccount has 'watch' permissions on Ingress resources.
+	watcher, err := iw.Client.Watch(ctx, ingNamespace, ingName)
+	if err != nil {
+		// Log and return an error if setting up the watcher failed.
+		return timeout * 2, err
+	}
+	// Ensure the watcher stops once the function exits.
+	defer watcher.Stop()
+
+	// Set up a channel to handle the timeout scenario.
+	timeoutCh := time.After(timeout)
+
+	for {
+		select {
+		// Watch for events from the Ingress watcher.
+		case event, ok := <-watcher.ResultChan():
+			if !ok {
+				// If the watcher channel closes unexpectedly, return an error.
+				logger.Error("watch channel closed")
+				return time.Since(startTime) * 2, fmt.Errorf("watch channel closed")
+			}
+
+			// debug
+			fmt.Printf("Received event: %s for Ingress: %s\n", event.Type, ingName)
+			logger.Debugf("event: %v", event)
+
+			// Process only the Modified event type for the Ingress resource.
+			if event.Type == watch.Modified {
+				// Cast the event object to an Ingress resource.
+				ing, ok := event.Object.(*networkingv1.Ingress)
+				// Check if the ACME challenge is absent in the modified Ingress.
+				if ok && !isContainsAcmeChallenge(ctx, ing) {
+					// If the challenge is absent, return the elapsed time.
+					return time.Since(startTime), nil
+				}
+			}
+		// Handle the function timeout scenario.
+		case <-timeoutCh:
+			logger.Error("Timeout reached. Stopping.")
+			return time.Since(startTime) * 2, fmt.Errorf("Timeout reached. Stopping.")
+		// Handle context cancellation or deadline exceedance.
+		case <-ctx.Done():
+			logger.Errorf("Context cancelled or deadline exceeded. Stopping, %v", ctx.Err())
+			return time.Since(startTime) * 2, ctx.Err()
+		}
+	}
 }

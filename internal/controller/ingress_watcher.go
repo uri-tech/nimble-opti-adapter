@@ -677,6 +677,7 @@ func (iw *IngressWatcher) waitForAcmeChallenge(ctx context.Context, namespace st
 	defer watcher.Stop()
 
 	// Set a timeout for safety, for example, to exit after 10 minutes if the condition doesn't become true.
+	// TODO: Make this configurable.
 	timeoutCh := time.After(10 * time.Second)
 
 	for {

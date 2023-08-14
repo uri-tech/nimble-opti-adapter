@@ -1,12 +1,43 @@
 #!/bin/bash
-set -e
 
-DOCKER_USERNAME="${DOCKER_USERNAME:-nimbleopti}"
-IMAGE_TAG="${IMAGE_TAG:-v1.0.0}"
-DOCKER_IMAGE_NAME="${DOCKER_IMAGE_NAME:-${DOCKER_USERNAME}/nimble-opti-adapter}"
-CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.11.0}"
-SLEEP_TIME="${SLEEP_TIME:-1}"
-BUILD_PLATFORM="${BUILD_PLATFORM:-local}" # local or all
+# causes the shell to exit if any invoked command exits with a non-zero status
+set -e
+set -o pipefail # Fail the script if any command in a pipeline fails
+
+while getopts ":e:" opt; do
+  case $opt in
+  e)
+    export $OPTARG
+    ;;
+  \?)
+    echo "Invalid option: -$OPTARG" >&2
+    exit 1
+    ;;
+  :)
+    echo "Option -$OPTARG requires an argument." >&2
+    exit 1
+    ;;
+  esac
+done
+
+# Configuration variables with default values
+image_tag="${IMAGE_TAG:-v1.0.0}"
+cert_manager_version="${CERT_MANAGER_VERSION:-v1.11.0}"
+sleep_time="${SLEEP_TIME:-1}"
+docker_username="${DOCKER_USERNAME:-nimbleopti}"
+image_name="${DOCKER_IMAGE_NAME:-${docker_username}/cronjob-n-o-a}"
+build_platform="${BUILD_PLATFORM:-local}"
+admin_config="${ADMIN_CONFIG:-false}"
+test_code="${TEST_CODE:-true}"
+
+# Run Go tests
+if [ "$test_code" = "true" ]; then
+  echo "Running Go tests..."
+  go test ./... || {
+    echo "Go tests failed"
+    exit 1
+  }
+fi
 
 # Check for minikube and delete if exists
 if command -v minikube >/dev/null 2>&1; then
@@ -37,7 +68,7 @@ echo "Installing cert-manager with Helm..."
 helm install cert-manager jetstack/cert-manager \
   --namespace cert-manager \
   --create-namespace \
-  --version "$CERT_MANAGER_VERSION" \
+  --version "$cert_manager_version" \
   --set installCRDs=true \
   --set defaultIssuerName=letsencrypt-prod \
   --set defaultIssuerKind=ClusterIssuer \
@@ -62,37 +93,38 @@ spec:
           class: nginx
 EOF
 
-# Make manifests and install
-echo "Generating manifests..."
+echo "Making manifests..."
 make manifests
 
-echo "Installing application..."
+echo "Installing..."
 make install
 
 # Docker operations
-if [[ "$BUILD_PLATFORM" == "local" ]]; then
-  echo "Building Docker image..."
-  docker build -t "$DOCKER_IMAGE_NAME:latest" .
-  echo "Pushing Docker image to registry..."
-  docker push "$DOCKER_IMAGE_NAME"
-elif [[ "$BUILD_PLATFORM" == "all" ]]; then
-  echo "Building Docker image for all platforms..."
-  DOCKER_TARGET_PLATFORM="linux/arm64,linux/amd64"
+case "$build_platform" in
+"local")
+  docker build -t "$image_name:latest" -f Dockerfile .
+  docker push "$image_name"
+  ;;
+"all")
+  docker_target_platform="linux/arm64,linux/amd64"
   docker buildx build . \
-    --platform $DOCKER_TARGET_PLATFORM \
-    --tag $DOCKER_IMAGE_NAME:$IMAGE_TAG --tag $DOCKER_IMAGE_NAME:latest \
-    --file ./Dockerfile \
+    --platform "$docker_target_platform" \
+    --tag $image_name:$image_tag --tag $image_name:latest \
+    --file Dockerfile \
     --output type=image,push=true
-else
-  echo "Invalid BUILD_PLATFORM value. Choose either 'all' or 'local'."
-fi
+  ;;
+*)
+  echo "Invalid BUILD_PLATFORM value. Choose either 'all' or 'local'." >&2
+  exit 1
+  ;;
+esac
 
 echo "Deploying..."
-make deploy IMG=$DOCKER_IMAGE_NAME
+make deploy IMG=$image_name:latest
 
 # Allow the system a moment to process the previous command
-echo "Waiting for ${SLEEP_TIME}s..."
-sleep "$SLEEP_TIME"
+echo "Waiting for ${sleep_time}s..."
+sleep "$sleep_time"
 
 # Patch the deployment
 echo "Patching deployment to ensure images are always pulled..."

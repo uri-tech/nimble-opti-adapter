@@ -3,6 +3,7 @@ package ingresswatcher
 import (
 	"context"
 	"errors"
+	"net/http"
 	"time"
 
 	v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
@@ -17,6 +18,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/apiutil"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 )
 
@@ -32,9 +34,7 @@ var logger = loggerpkg.GetNamedLogger("ingresswatcher").WithOptions()
 
 // func NewIngressWatcher(clientKube *kubernetes.Clientset, ecfg *configenv.ConfigEnv) (*IngressWatcher, error) {
 func NewIngressWatcher(clientKube kubernetes.Interface, ecfg *configenv.ConfigEnv) (*IngressWatcher, error) {
-
-	// debug
-	logger.Debug("NewIngressWatcher")
+	logger.Debugf("starting NewIngressWatcher, ecfg: %v", ecfg)
 
 	cfg, err := config.GetConfig()
 	if err != nil {
@@ -56,8 +56,23 @@ func NewIngressWatcher(clientKube kubernetes.Interface, ecfg *configenv.ConfigEn
 		return nil, err
 	}
 
+	// Create a new dynamic RESTMapper. The RESTMapper is responsible for converting
+	// group, version, and kind information to and from resource paths and scopes.
+	// A dynamic RESTMapper can update itself automatically when new API types are registered.
+	// 'cfg' provides the connection configuration to the Kubernetes cluster, and
+	// 'http.DefaultClient' is the default HTTP client used for making API requests.
+	mapper, err := apiutil.NewDynamicRESTMapper(cfg, http.DefaultClient)
+	if err != nil {
+		logger.Fatalf("unable to create RESTMapper: %v", err)
+		return nil, err
+	}
+
 	// Create a new client to Kubernetes API.
-	cl, err := client.New(cfg, client.Options{Scheme: scheme})
+	cl, err := client.New(cfg, client.Options{
+		Cache:  nil,
+		Scheme: scheme,
+		Mapper: mapper,
+	})
 	if err != nil {
 		logger.Fatalf("unable to create client %v", err)
 		return nil, err
@@ -73,8 +88,7 @@ func NewIngressWatcher(clientKube kubernetes.Interface, ecfg *configenv.ConfigEn
 
 // auditIngressResources audits all Ingress with the label "nimble.opti.adapter/enabled:true".
 func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) error {
-	// debug
-	logger.Debug("AuditIngressResources")
+	logger.Debug("starting AuditIngressResources")
 
 	// initialize the IngressForRenewal struct
 	countIngressForRenewal := 0
@@ -105,10 +119,24 @@ func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) error {
 				return err
 			}
 			if !isRenew {
-				// change the connected ingress secret in ing.Spec.TLS for make cert-manager create new certificate secret.
-				if err := iw.changeIngressSecretName(ctx, &ing, ing.Spec.TLS[0].SecretName); err != nil {
-					logger.Errorf("Failed to delete ingress secret: %v", err)
+				oldSecret := ing.Spec.TLS[0].SecretName
+				logger.Infof("Certificate was not renewed, trying now change secret %s for renewal.", oldSecret)
+
+				// change the connected ingress secret in ing.Spec.TLS for making cert-manager create new certificate secret.
+				if err := iw.changeIngressSecretName(ctx, &ing, oldSecret); err != nil {
+					logger.Errorf("Failed to change ingress secret name: %v", err)
 					return err
+				}
+				isSecondTeyRenew, err := iw.startCertificateRenewalAudit(ctx, &ing)
+				if err != nil {
+					logger.Errorf("Failed to start certificate renewal: %v", err)
+					return err
+				}
+				if !isSecondTeyRenew {
+					logger.Infof("Certificate was not renewed also when it secret name was change, old secret: %s, new secret: %s.", oldSecret, ing.Spec.TLS[0].SecretName)
+				} else {
+					countIngressRenewed++
+					logger.Infof("Certificate was renewed when it secret name was change, ingress name: %v", ing.Name)
 				}
 			} else {
 				countIngressRenewed++
@@ -153,10 +181,9 @@ func (iw *IngressWatcher) AuditIngressResources(ctx context.Context) error {
 	return nil
 }
 
-// startCertificateRenewal get ingress that has "".well-known/acme-challenge" and resolve it.
+// startCertificateRenewal get ingress that has "".well-known/acme-challenge" and resolve it. if the resolve was successful - return true, else - return false.
 func (iw *IngressWatcher) startCertificateRenewalAudit(ctx context.Context, ing *networkingv1.Ingress) (bool, error) {
-	// debug
-	logger.Debug("startCertificateRenewal")
+	logger.Debugf("starting startCertificateRenewal, ingress: %v", ing.Name)
 
 	var isRenew = false
 
@@ -190,7 +217,7 @@ func (iw *IngressWatcher) startCertificateRenewalAudit(ctx context.Context, ing 
 
 // changeIngressSecretName change the secret name in ing.Spec.TLS to make cert-manager create new certificate secret.
 func (iw *IngressWatcher) changeIngressSecretName(ctx context.Context, ing *networkingv1.Ingress, secretName string) error {
-	logger.Debug("changeIngressSecretName")
+	logger.Debugf("starting changeIngressSecretName, ingress: %v", ing.Name)
 
 	// Iterate over spec.tls[] to fetch associated secrets
 	idxName := 0
@@ -236,7 +263,7 @@ func (iw *IngressWatcher) changeIngressSecretName(ctx context.Context, ing *netw
 
 // delete connected ingress secret
 func (iw *IngressWatcher) deleteIngressSecret(ctx context.Context, secretName string, secretNamespace string) error {
-	logger.Debug("deleteIngressSecret")
+	logger.Debugf("starting deleteIngressSecret, secretName: %v", secretName)
 
 	// Create a Secret object with only Name and Namespace populated.
 	deleteSecret := &corev1.Secret{

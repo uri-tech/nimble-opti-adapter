@@ -14,8 +14,7 @@ import (
 
 // removeHTTPSAnnotation removes the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation from an Ingress.
 func (iw *IngressWatcher) removeHTTPSAnnotation(ctx context.Context, ing *networkingv1.Ingress) error {
-	// debug
-	logger.Debug("removeHTTPSAnnotation")
+	logger.Debugf("starting removeHTTPSAnnotation, ing: %v", ing.Name)
 
 	key := utils.IngressKey(ing)
 
@@ -47,7 +46,7 @@ func (iw *IngressWatcher) removeHTTPSAnnotation(ctx context.Context, ing *networ
 
 // addHTTPSAnnotation adds the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation to an Ingress.
 func (iw *IngressWatcher) addHTTPSAnnotation(ctx context.Context, ing *networkingv1.Ingress) error {
-	logger.Debug("addHTTPSAnnotation")
+	logger.Debugf("starting addHTTPSAnnotation, ing: %v", ing.Name)
 
 	key := utils.IngressKey(ing)
 

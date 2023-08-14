@@ -20,7 +20,7 @@ type RealKubernetesClient struct {
 
 // Watch implements the KubernetesClient interface.
 func (r *RealKubernetesClient) Watch(ctx context.Context, namespace, ingressName string) (watch.Interface, error) {
-	logger.Debug("RealKubernetesClient.Watch")
+	logger.Debugf("starting RealKubernetesClient.Watch, namespace: %v, ingressName: %v", namespace, ingressName)
 
 	opts := metav1.SingleObject(metav1.ObjectMeta{Name: ingressName})
 	return r.NetworkingV1().Ingresses(namespace).Watch(ctx, opts)
