@@ -249,11 +249,11 @@ func TestStartCertificateRenewalAudit(t *testing.T) {
 		initialPaths []string
 		isRenewed    bool
 	}{
-		// {
-		// 	name:         "Successful certificate renewal",
-		// 	initialPaths: []string{"/app", "/.well-known/acme-challenge"},
-		// 	isRenewed:    true,
-		// },
+		{
+			name:         "Successful certificate renewal",
+			initialPaths: []string{"/app", "/.well-known/acme-challenge"},
+			isRenewed:    true,
+		},
 		{
 			name:         "unsuccessful certificate renewal",
 			initialPaths: []string{"/app", "/.well-known/acme-challenge"},
