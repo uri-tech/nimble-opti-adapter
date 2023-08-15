@@ -52,7 +52,7 @@ case "$build_platform" in
     ;;
 "all")
     docker_target_platform="linux/arm64,linux/amd64"
-    docker buildx build cronjob/ \
+    docker buildx build . \
         --platform "$docker_target_platform" \
         --tag $docker_image_name:$image_tag --tag $docker_image_name:latest \
         --file cronjob/Dockerfile \

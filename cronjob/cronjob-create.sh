@@ -104,7 +104,7 @@ if [[ "$defaultBuildPlatform" == "local" ]]; then
 elif [[ "$defaultBuildPlatform" == "all" ]]; then
   echo "Building Docker image for all platforms..."
   targetPlatforms="linux/arm64,linux/amd64"
-  docker buildx build cronjob/ \
+  docker buildx build . \
     --platform "$targetPlatforms" \
     --tag $defaultImageName:$defaultImageTag --tag $defaultImageName:latest \
     --file cronjob/Dockerfile \

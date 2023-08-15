@@ -60,6 +60,6 @@ func TestKubernetesClient_Watch(t *testing.T) {
 		t.Fatalf("expected returned watcher to be the fake watcher, but it wasn't")
 	}
 
-	// // Ensure that the mock's expected methods were called
-	// mockClient.AssertExpectations(t)
+	// Ensure that the mock's expected methods were called
+	mockClient.AssertExpectations(t)
 }
