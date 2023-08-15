@@ -16,7 +16,6 @@ RUN go mod download
 # Copy the application code into the container
 COPY cronjob/ cronjob/
 COPY utils/ utils/
-COPY configenv/ configenv/
 COPY loggerpkg/ loggerpkg/
 
 # Build the application
