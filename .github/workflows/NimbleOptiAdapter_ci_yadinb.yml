@@ -25,7 +25,7 @@ jobs:
 
       - name: Login to docker hub registry.
         run: |
-          docker login docker.io -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+          docker login docker.io -u ${{ secrets.DOCKER_NOA_USERNAME }} -p ${{ secrets.DOCKER_NOA_PASSWORD }}
 
       - name: Build and push "NimbleOpti".
         run: |
