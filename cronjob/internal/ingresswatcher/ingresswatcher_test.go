@@ -21,9 +21,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	fakec "sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
+
+// func newIngressWatcherForTesting(clientKube *kubernetes.Clientset, ecfg *configenv.ConfigEnv) (*IngressWatcher, error) {
+func newIngressWatcherForTesting(cfakeClientset *fake.Clientset, ecfg *configenv.ConfigEnv) (*IngressWatcher, error) {
+	cl, err := client.New(&rest.Config{}, client.Options{
+		Cache: nil,
+	})
+	if err != nil {
+		logger.Fatalf("unable to create client %v", err)
+		return nil, err
+	}
+	return &IngressWatcher{
+		Client:     &RealKubernetesClient{cfakeClientset},
+		ClientObj:  cl,
+		auditMutex: utils.NewNamedMutex(),
+		Config:     ecfg,
+	}, nil
+}
 
 // createIngressRules return a list of Ingress rules for the provided paths.
 func createIngressRules(paths []string) []networkingv1.IngressRule {
@@ -143,7 +161,7 @@ func setupIngressWatcher(client client.Client) (*IngressWatcher, error) {
 	// 	panic(fmt.Sprintf("Failed to add NimbleOpti to scheme: %v", err))
 	// }
 
-	iw, err := NewIngressWatcher(fakeClientset, ecfg)
+	iw, err := newIngressWatcherForTesting(fakeClientset, ecfg)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create IngressWatcher: %v", err))
 	}
@@ -173,7 +191,7 @@ func setupIngressWatcherMock(clientObj client.Client, client *FakeKubernetesClie
 	}
 
 	// Create a new IngressWatcher.
-	iw, err := NewIngressWatcher(fakeClientset, ecfg)
+	iw, err := newIngressWatcherForTesting(fakeClientset, ecfg)
 	if err != nil {
 		panic(fmt.Errorf("Failed to create IngressWatcher: %v", err))
 	}
@@ -210,7 +228,7 @@ func TestNewIngressWatcher(t *testing.T) {
 
 		// TODO: Mock config.GetConfig() to return a dummy configuration
 
-		iw, err := NewIngressWatcher(fakeClientset, ecfg)
+		iw, err := newIngressWatcherForTesting(fakeClientset, ecfg)
 		assert.NoError(t, err)
 		assert.NotNil(t, iw)
 
