@@ -32,7 +32,7 @@ testCode="${TEST_CODE:-true}" # true or false
 # Run Go tests
 if [ "$testCode" = "true" ]; then
   echo "Running Go tests..."
-  go test ./cronjob/... || {
+  go test ./cronjob/... -count=1 || {
     echo "Go tests failed"
     exit 1
   }

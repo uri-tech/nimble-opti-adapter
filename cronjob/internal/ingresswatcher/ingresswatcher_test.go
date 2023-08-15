@@ -126,9 +126,16 @@ func setupIngressWatcher(client client.Client) (*IngressWatcher, error) {
 	fakeClientset := fake.NewSimpleClientset()
 
 	// Load environment variables configuration.
-	ecfg, err := configenv.LoadConfig()
-	if err != nil {
-		panic(fmt.Sprintf("Failed to load config: %v", err))
+	// ecfg, err := configenv.LoadConfig()
+	// if err != nil {
+	// 	panic(fmt.Sprintf("Failed to load config: %v", err))
+	// }
+	ecfg := &configenv.ConfigEnv{
+		RunMode:                     "dev",
+		CertificateRenewalThreshold: 60,
+		AnnotationRemovalDelay:      10,
+		AdminUserPermission:         false,
+		LogOutput:                   "console",
 	}
 
 	// // Add NimbleOpti to the scheme.
@@ -153,9 +160,16 @@ func setupIngressWatcherMock(clientObj client.Client, client *FakeKubernetesClie
 	fakeClientset := fake.NewSimpleClientset()
 
 	// Load environment variables configuration.
-	ecfg, err := configenv.LoadConfig()
-	if err != nil {
-		panic(fmt.Errorf("Failed to load config: %v", err))
+	// ecfg, err := configenv.LoadConfig()
+	// if err != nil {
+	// 	panic(fmt.Errorf("Failed to load config: %v", err))
+	// }
+	ecfg := &configenv.ConfigEnv{
+		RunMode:                     "dev",
+		CertificateRenewalThreshold: 60,
+		AnnotationRemovalDelay:      10,
+		AdminUserPermission:         false,
+		LogOutput:                   "console",
 	}
 
 	// Create a new IngressWatcher.
@@ -177,9 +191,16 @@ func TestNewIngressWatcher(t *testing.T) {
 	fakeClientset := fake.NewSimpleClientset()
 
 	// Load environment variables configuration.
-	ecfg, err := configenv.LoadConfig()
-	if err != nil {
-		t.Fatalf("Failed to load config: %v", err)
+	// ecfg, err := configenv.LoadConfig()
+	// if err != nil {
+	// 	t.Fatalf("Failed to load config: %v", err)
+	// }
+	ecfg := &configenv.ConfigEnv{
+		RunMode:                     "dev",
+		CertificateRenewalThreshold: 60,
+		AnnotationRemovalDelay:      10,
+		AdminUserPermission:         false,
+		LogOutput:                   "console",
 	}
 
 	t.Run("successfully initialize an IngressWatcher", func(t *testing.T) {
