@@ -144,10 +144,6 @@ func setupIngressWatcher(client client.Client) (*IngressWatcher, error) {
 	fakeClientset := fake.NewSimpleClientset()
 
 	// Load environment variables configuration.
-	// ecfg, err := configenv.LoadConfig()
-	// if err != nil {
-	// 	panic(fmt.Sprintf("Failed to load config: %v", err))
-	// }
 	ecfg := &configenv.ConfigEnv{
 		RunMode:                     "dev",
 		CertificateRenewalThreshold: 60,
@@ -156,11 +152,6 @@ func setupIngressWatcher(client client.Client) (*IngressWatcher, error) {
 		LogOutput:                   "console",
 	}
 
-	// // Add NimbleOpti to the scheme.
-	// if err := v1.AddToScheme(scheme.Scheme); err != nil {
-	// 	panic(fmt.Sprintf("Failed to add NimbleOpti to scheme: %v", err))
-	// }
-
 	iw, err := newIngressWatcherForTesting(fakeClientset, ecfg)
 	if err != nil {
 		panic(fmt.Sprintf("Failed to create IngressWatcher: %v", err))
@@ -168,7 +159,7 @@ func setupIngressWatcher(client client.Client) (*IngressWatcher, error) {
 
 	iw.ClientObj = client
 	iw.Config = ecfg
-	// iw.auditMutex = utils.NewNamedMutex()
+	iw.auditMutex = utils.NewNamedMutex()
 
 	return iw, nil
 }
@@ -178,10 +169,6 @@ func setupIngressWatcherMock(clientObj client.Client, client *FakeKubernetesClie
 	fakeClientset := fake.NewSimpleClientset()
 
 	// Load environment variables configuration.
-	// ecfg, err := configenv.LoadConfig()
-	// if err != nil {
-	// 	panic(fmt.Errorf("Failed to load config: %v", err))
-	// }
 	ecfg := &configenv.ConfigEnv{
 		RunMode:                     "dev",
 		CertificateRenewalThreshold: 60,
@@ -209,10 +196,6 @@ func TestNewIngressWatcher(t *testing.T) {
 	fakeClientset := fake.NewSimpleClientset()
 
 	// Load environment variables configuration.
-	// ecfg, err := configenv.LoadConfig()
-	// if err != nil {
-	// 	t.Fatalf("Failed to load config: %v", err)
-	// }
 	ecfg := &configenv.ConfigEnv{
 		RunMode:                     "dev",
 		CertificateRenewalThreshold: 60,
@@ -310,22 +293,6 @@ func TestStartCertificateRenewalAudit(t *testing.T) {
 				t.Fatal(err)
 			}
 			iw.Config.AnnotationRemovalDelay = 5
-
-			// // Create the NimbleOpti object.
-			// nimbleOpti := &v1.NimbleOpti{
-			// 	ObjectMeta: metav1.ObjectMeta{
-			// 		Name:      "default",
-			// 		Namespace: "default",
-			// 	},
-			// 	Spec: v1.NimbleOptiSpec{
-			// 		TargetNamespace:             "default",
-			// 		CertificateRenewalThreshold: 3,
-			// 		AnnotationRemovalDelay:      5,
-			// 	},
-			// }
-			// if err := fakeClient.Create(ctx, nimbleOpti); err != nil {
-			// 	t.Fatalf("Failed to create NimbleOpti: %v", err)
-			// }
 
 			// Test
 			gotRenewalCh := make(chan bool)

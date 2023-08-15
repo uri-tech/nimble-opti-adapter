@@ -26,23 +26,12 @@ jobs:
         run: |
           go test ./cronjob/... -count=1
 
-      - name: Setup Docker credential helper
-        run: |
-            sudo apt-get update
-            sudo apt-get install -y pass
-            curl -fsSL https://github.com/docker/docker-credential-helpers/releases/download/v0.8.0/docker-credential-pass-v0.8.0.linux-amd64 -o docker-credential-pass
-            chmod +x docker-credential-pass
-            sudo mv docker-credential-pass /usr/local/bin/
-            echo '{ "credsStore": "pass" }' > ~/.docker/config.json
-        
-
       - name: Login to docker hub registry.
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_NOA_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_NOA_PASSWORD }}
         run: |
-          echo "$DOCKER_PASSWORD" | docker login docker.io -u "$DOCKER_USERNAME" --password-stdin
-
+          docker login docker.io -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
 
       - name: Build and push "NimbleOpti".
         run: |
