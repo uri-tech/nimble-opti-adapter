@@ -7,7 +7,7 @@ import (
 
 	"github.com/uri-tech/nimble-opti-adapter/cronjob/configenv"
 	"github.com/uri-tech/nimble-opti-adapter/cronjob/internal/ingresswatcher"
-	"github.com/uri-tech/nimble-opti-adapter/cronjob/loggerpkg"
+	"github.com/uri-tech/nimble-opti-adapter/loggerpkg"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )

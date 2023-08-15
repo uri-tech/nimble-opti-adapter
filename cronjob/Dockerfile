@@ -14,10 +14,11 @@ COPY go.mod go.sum ./
 RUN go mod download
 
 # Copy the application code into the container
-COPY . .
+COPY cronjob/ cronjob/
+COPY utils/ utils/
+COPY loggerpkg/ loggerpkg/
 
 # Build the application
-# RUN go build ./cmd/ingressodifier/mai-annotation-mn.go
 RUN go build -o ingress-annotation-modifier ./cronjob/cmd/ingress-annotation-modifier
 
 ############################

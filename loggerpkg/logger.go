@@ -67,7 +67,7 @@ func init() {
 	if err != nil {
 		panic("Failed to build logger: " + err.Error())
 	}
-	defer logger.Sync() // Ensure logs are flushed before exiting.
+	// defer logger.Sync() // Ensure logs are flushed before exiting.
 	sugarLogger = logger.Sugar()
 }
 

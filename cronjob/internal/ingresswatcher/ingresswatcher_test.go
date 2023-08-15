@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
+	// v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
 	"github.com/uri-tech/nimble-opti-adapter/cronjob/configenv"
 	"github.com/uri-tech/nimble-opti-adapter/utils"
 	corev1 "k8s.io/api/core/v1"
@@ -131,10 +131,10 @@ func setupIngressWatcher(client client.Client) (*IngressWatcher, error) {
 		panic(fmt.Sprintf("Failed to load config: %v", err))
 	}
 
-	// Add NimbleOpti to the scheme.
-	if err := v1.AddToScheme(scheme.Scheme); err != nil {
-		panic(fmt.Sprintf("Failed to add NimbleOpti to scheme: %v", err))
-	}
+	// // Add NimbleOpti to the scheme.
+	// if err := v1.AddToScheme(scheme.Scheme); err != nil {
+	// 	panic(fmt.Sprintf("Failed to add NimbleOpti to scheme: %v", err))
+	// }
 
 	iw, err := NewIngressWatcher(fakeClientset, ecfg)
 	if err != nil {
@@ -151,12 +151,6 @@ func setupIngressWatcher(client client.Client) (*IngressWatcher, error) {
 // setupIngressWatcher initializes a mock IngressWatcher for testing purposes.
 func setupIngressWatcherMock(clientObj client.Client, client *FakeKubernetesClient) (*IngressWatcher, error) {
 	fakeClientset := fake.NewSimpleClientset()
-
-	// Add NimbleOpti to the scheme.
-	err := v1.AddToScheme(scheme.Scheme)
-	if err != nil {
-		panic(fmt.Sprintf("Failed to add NimbleOpti to scheme: %v", err))
-	}
 
 	// Load environment variables configuration.
 	ecfg, err := configenv.LoadConfig()
@@ -278,21 +272,21 @@ func TestStartCertificateRenewalAudit(t *testing.T) {
 			}
 			iw.Config.AnnotationRemovalDelay = 5
 
-			// Create the NimbleOpti object.
-			nimbleOpti := &v1.NimbleOpti{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "default",
-					Namespace: "default",
-				},
-				Spec: v1.NimbleOptiSpec{
-					TargetNamespace:             "default",
-					CertificateRenewalThreshold: 3,
-					AnnotationRemovalDelay:      5,
-				},
-			}
-			if err := fakeClient.Create(ctx, nimbleOpti); err != nil {
-				t.Fatalf("Failed to create NimbleOpti: %v", err)
-			}
+			// // Create the NimbleOpti object.
+			// nimbleOpti := &v1.NimbleOpti{
+			// 	ObjectMeta: metav1.ObjectMeta{
+			// 		Name:      "default",
+			// 		Namespace: "default",
+			// 	},
+			// 	Spec: v1.NimbleOptiSpec{
+			// 		TargetNamespace:             "default",
+			// 		CertificateRenewalThreshold: 3,
+			// 		AnnotationRemovalDelay:      5,
+			// 	},
+			// }
+			// if err := fakeClient.Create(ctx, nimbleOpti); err != nil {
+			// 	t.Fatalf("Failed to create NimbleOpti: %v", err)
+			// }
 
 			// Test
 			gotRenewalCh := make(chan bool)

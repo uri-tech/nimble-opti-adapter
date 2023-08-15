@@ -8,8 +8,8 @@ set -o pipefail # Fail the script if any command in a pipeline fails
 docker_username="${DOCKER_USERNAME:-nimbleopti}"
 image_tag="${IMAGE_TAG:-v1.0.0}"
 docker_image_name="${DOCKER_IMAGE_NAME:-${docker_username}/nimble-opti-adapter}"
-build_platform="${BUILD_PLATFORM:-local}" # local or all
-testCode="${TEST_CODE:-true}"             # true or false
+build_platform="${BUILD_PLATFORM:-all}" # local or all
+testCode="${TEST_CODE:-true}"           # true or false
 
 # Parse command line options
 while getopts ":e:" opt; do

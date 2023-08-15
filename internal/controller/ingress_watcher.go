@@ -65,14 +65,6 @@ func (r *RealKubernetesClient) Watch(ctx context.Context, namespace, ingressName
 	return r.NetworkingV1().Ingresses(namespace).Watch(ctx, opts)
 }
 
-// common way to do kreate uniq key in Kubernetes - use the namespace and the name of the resource, joined by a delimiter. it's like cache.MetaNamespaceKeyFunc(obj).
-func ingressKey(ing *networkingv1.Ingress) string {
-	// debug
-	klog.Info("debug - ingressKey")
-
-	return ing.Namespace + "/" + ing.Name
-}
-
 // NewIngressWatcher initializes a new IngressWatcher and starts
 // an IngressInformer for caching Ingress resources.
 func NewIngressWatcher(clientKube kubernetes.Interface, stopCh <-chan struct{}) (*IngressWatcher, error) {
@@ -167,69 +159,6 @@ func (iw *IngressWatcher) handleIngressAdd(obj interface{}) {
 			klog.Errorf("error processing ingress. %v", err)
 		}
 	}
-}
-
-// removeHTTPSAnnotation removes the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation from an Ingress.
-func (iw *IngressWatcher) removeHTTPSAnnotation(ctx context.Context, ing *networkingv1.Ingress) error {
-	// debug
-	klog.Info("debug - removeHTTPSAnnotation")
-
-	delete(ing.Annotations, "nginx.ingress.kubernetes.io/backend-protocol")
-
-	key := ingressKey(ing)
-
-	// debug
-	klog.Infof("debug - removeHTTPSAnnotation - key: %s", key)
-
-	if isLock := iw.auditMutex.TryLock(key); isLock {
-		defer iw.auditMutex.Unlock(key)
-		// debug
-		klog.Infof("debug - removeHTTPSAnnotation - key is locked")
-
-		if err := iw.ClientObj.Update(ctx, ing); err != nil {
-			klog.Error("Unable to remove HTTPS annotation: ", err)
-			return err
-		}
-	} else {
-		errMassage := fmt.Sprintf("key %s is locked, and it should be unlocked", key)
-		klog.Errorf(errMassage)
-		return errors.New(errMassage)
-	}
-
-	return nil
-}
-
-// addHTTPSAnnotation adds the "nginx.ingress.kubernetes.io/backend-protocol: HTTPS" annotation to an Ingress.
-func (iw *IngressWatcher) addHTTPSAnnotation(ctx context.Context, ing *networkingv1.Ingress) error {
-	// debug
-	klog.Info("debug - addHTTPSAnnotation")
-
-	if ing.Annotations == nil {
-		ing.Annotations = make(map[string]string)
-	}
-	ing.Annotations["nginx.ingress.kubernetes.io/backend-protocol"] = "HTTPS"
-
-	key := ingressKey(ing)
-
-	// debug
-	klog.Infof("debug - addHTTPSAnnotation - key: %s", key)
-
-	if isLock := iw.auditMutex.TryLock(key); isLock {
-		defer iw.auditMutex.Unlock(key)
-		// debug
-		klog.Infof("debug - addHTTPSAnnotation - key is locked")
-
-		if err := iw.ClientObj.Update(ctx, ing); err != nil {
-			klog.Error("Unable to add HTTPS annotation: ", err)
-			return err
-		}
-	} else {
-		errMassage := fmt.Sprintf("key %s is locked, and should be unlocked", key)
-		klog.Errorf(errMassage)
-		return errors.New(errMassage)
-	}
-
-	return nil
 }
 
 // StartAudit audits daily all Ingress resources with the label "nimble.opti.adapter/enabled=true" in the cluster

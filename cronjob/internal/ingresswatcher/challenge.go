@@ -6,15 +6,12 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
-	"strings"
-	"time"
-
-	// _ "github.com/uri-tech/nimble-opti-adapter/cronjob/loggerpkg"
-
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
 	"k8s.io/apimachinery/pkg/watch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"strings"
+	"time"
 )
 
 // waitForChallengeAbsence waits for the absence of the ACME challenge path in the Ingress or until a timeout is reached.

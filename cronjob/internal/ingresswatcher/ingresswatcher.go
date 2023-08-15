@@ -5,9 +5,9 @@ import (
 	"errors"
 	"time"
 
-	v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
+	// v1 "github.com/uri-tech/nimble-opti-adapter/api/v1"
 	"github.com/uri-tech/nimble-opti-adapter/cronjob/configenv"
-	"github.com/uri-tech/nimble-opti-adapter/cronjob/loggerpkg"
+	"github.com/uri-tech/nimble-opti-adapter/loggerpkg"
 	"github.com/uri-tech/nimble-opti-adapter/utils"
 	corev1 "k8s.io/api/core/v1"
 	networkingv1 "k8s.io/api/networking/v1"
@@ -42,11 +42,12 @@ func NewIngressWatcher(clientKube kubernetes.Interface, ecfg *configenv.ConfigEn
 
 	// Create a new scheme for decoding into.
 	scheme := runtime.NewScheme()
-	// assuming `v1` package has `AddToScheme` function
-	if err := v1.AddToScheme(scheme); err != nil {
-		logger.Fatalf("unable to add v1 scheme %v", err)
-		return nil, err
-	}
+
+	// // assuming `v1` package has `AddToScheme` function
+	// if err := v1.AddToScheme(scheme); err != nil {
+	// 	logger.Fatalf("unable to add v1 scheme %v", err)
+	// 	return nil, err
+	// }
 
 	// Add client-go's scheme for core Kubernetes types
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
