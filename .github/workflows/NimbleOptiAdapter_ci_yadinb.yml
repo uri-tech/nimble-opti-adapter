@@ -4,15 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - "yadinb"
-    # pull_request:
-    #   branches: [ "main" ]
-    # paths:
-    #   # - "controllers/**"
-    #   # - "Dockerfile"
-    #   # - "main.go"
-    #   - "*"
-    #   # Exclude README.md from triggering the workflow
+      - "yadinb/test"
     paths-ignore:
       - "README.md"
 jobs:

@@ -1,4 +1,4 @@
-name: NimbleOptiAdapter_ci_main
+name: NimbleOptiAdapter_ci_cronjob
 
 on:
   workflow_dispatch:
@@ -20,12 +20,12 @@ jobs:
       - name: Setup Go environment
         uses: actions/setup-go@v2
         with:
-          go-version: 1.20
+          go-version: '^1.20'
 
       - name: Run Go tests in cronjob directory
         run: |
           cd cronjob
-          go test ./cronjob/...
+          go test ./...
 
       - name: Login to docker hub registry.
         run: |

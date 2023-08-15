@@ -4,15 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - "uri-tech"
-    # pull_request:
-    #   branches: [ "main" ]
-    # paths:
-    #   # - "controllers/**"
-    #   # - "Dockerfile"
-    #   # - "main.go"
-    #   - "*"
-    #   # Exclude README.md from triggering the workflow
+      - "uri-tech/test"
     paths-ignore:
       - "README.md"
 jobs:
@@ -26,6 +18,7 @@ jobs:
       - name: Login to docker hub registry.
         run: |
           docker login docker.io -u ${{ secrets.DOCKER_NOA_USERNAME }} -p ${{ secrets.DOCKER_NOA_PASSWORD }}
+          # echo ${{ secrets.DOCKER_NOA_USERNAME }} | docker login -u ${{ secrets.DOCKER_NOA_USERNAME }} --password-stdin
       - name: Build and push "NimbleOpti".
         run: |
           IMAGE_TAG=$(date +%s)
