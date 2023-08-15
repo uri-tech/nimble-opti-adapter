@@ -26,6 +26,9 @@ jobs:
         run: |
           go test ./cronjob/... -count=1
 
+      - name: List directories
+        run: ls -la
+
       - name: Login to docker hub registry.
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_NOA_USERNAME }}
@@ -41,7 +44,7 @@ jobs:
           DOCKER_TARGET_PLATFORM="linux/arm64,linux/amd64"
           DOCKER_USERNAME="nimbleopti"
           DOCKER_IMAGE_NAME="cronjob-n-o-a"
-          docker buildx build cronjob/ \
+          docker buildx build . \
           --platform "$DOCKER_TARGET_PLATFORM" \
           --tag $DOCKER_IMAGE_NAME:$IMAGE_TAG --tag $DOCKER_IMAGE_NAME:latest \
           --file cronjob/Dockerfile \

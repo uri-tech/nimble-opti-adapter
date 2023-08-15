@@ -49,16 +49,16 @@ func TestKubernetesClient_Watch(t *testing.T) {
 
 	mockClient.On("Watch", mock.Anything, expectedNamespace, expectedIngressName).Return(fakeWatch, nil)
 
-	// watcher, err := mockClient.Watch(context.Background(), expectedNamespace, expectedIngressName)
-	// t.Logf("watcher: %v", watcher)
+	watcher, err := mockClient.Watch(context.Background(), expectedNamespace, expectedIngressName)
+	t.Logf("watcher: %v", watcher)
 
-	// if err != nil {
-	// 	t.Fatalf("expected no error, but got: %v", err)
-	// }
+	if err != nil {
+		t.Fatalf("expected no error, but got: %v", err)
+	}
 
-	// if watcher != fakeWatch {
-	// 	t.Fatalf("expected returned watcher to be the fake watcher, but it wasn't")
-	// }
+	if watcher != fakeWatch {
+		t.Fatalf("expected returned watcher to be the fake watcher, but it wasn't")
+	}
 
 	// // Ensure that the mock's expected methods were called
 	// mockClient.AssertExpectations(t)
