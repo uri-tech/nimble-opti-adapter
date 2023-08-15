@@ -25,7 +25,6 @@ jobs:
       - name: Run Go tests in cronjob directory
         run: |
           go test ./cronjob/... -count=1
-          cd cronjob
 
       - name: Login to docker hub registry.
         env:

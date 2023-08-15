@@ -2,6 +2,7 @@ package ingresswatcher
 
 import (
 	"context"
+	"testing"
 
 	"github.com/stretchr/testify/mock"
 	"k8s.io/apimachinery/pkg/watch"
@@ -37,28 +38,28 @@ func (m *FakeKubernetesClient) Watch(ctx context.Context, namespace, ingressName
 	return args.Get(0).(watch.Interface), args.Error(1)
 }
 
-// func TestKubernetesClient_Watch(t *testing.T) {
-// 	mockClient := new(FakeKubernetesClient)
-// 	fakeWatch := &FakeWatcher{
-// 		resultCh: make(chan watch.Event),
-// 	}
+func TestKubernetesClient_Watch(t *testing.T) {
+	mockClient := new(FakeKubernetesClient)
+	fakeWatch := &FakeWatcher{
+		resultCh: make(chan watch.Event),
+	}
 
-// 	expectedNamespace := "default"
-// 	expectedIngressName := "test-ingress"
+	expectedNamespace := "default"
+	expectedIngressName := "test-ingress"
 
-// 	mockClient.On("Watch", mock.Anything, expectedNamespace, expectedIngressName).Return(fakeWatch, nil)
+	mockClient.On("Watch", mock.Anything, expectedNamespace, expectedIngressName).Return(fakeWatch, nil)
 
-// 	watcher, err := mockClient.Watch(context.Background(), expectedNamespace, expectedIngressName)
-// 	t.Logf("watcher: %v", watcher)
+	// watcher, err := mockClient.Watch(context.Background(), expectedNamespace, expectedIngressName)
+	// t.Logf("watcher: %v", watcher)
 
-// 	if err != nil {
-// 		t.Fatalf("expected no error, but got: %v", err)
-// 	}
+	// if err != nil {
+	// 	t.Fatalf("expected no error, but got: %v", err)
+	// }
 
-// 	if watcher != fakeWatch {
-// 		t.Fatalf("expected returned watcher to be the fake watcher, but it wasn't")
-// 	}
+	// if watcher != fakeWatch {
+	// 	t.Fatalf("expected returned watcher to be the fake watcher, but it wasn't")
+	// }
 
-// 	// Ensure that the mock's expected methods were called
-// 	mockClient.AssertExpectations(t)
-// }
+	// // Ensure that the mock's expected methods were called
+	// mockClient.AssertExpectations(t)
+}
