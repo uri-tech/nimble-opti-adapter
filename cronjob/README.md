@@ -4,11 +4,12 @@ Welcome to the Ingress Annotation Modifier CronJob! This tool is designed to sca
 
 ## 📂 Contents
 
-1. [Function Descriptions](#function-descriptions)
-2. [Deployment](#deployment)
-3. [Monitoring & Logging](#monitoring-&-logging)
-4. [Best Practices & Tips](#best-practices-&-tips)
-5. [Configuration Insights](#configuration-insights)
+1. [Function Descriptions](#-function-descriptions-)
+2. [Deployment](#-deployment-)
+3. [Deployment in test environment](#-deployment-in-test-environment-)
+4. [Monitoring & Logging](#-monitoring--logging-)
+5. [Best Practices & Tips](#-best-practices--tips-)
+6. [Configuration Insights](#-configuration-insights-)
 
 
 ## 🛠 Function Descriptions 🛠
