@@ -28,10 +28,9 @@ jobs:
 
       - name: Login to docker hub registry.
         env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_NOA_USERNAME }}
           DOCKER_PASSWORD: ${{ secrets.DOCKER_NOA_PASSWORD }}
         run: |
-          docker login docker.io -u "$DOCKER_USERNAME" -p "$DOCKER_PASSWORD"
+          docker login docker.io -u nimbleopti -p "$DOCKER_PASSWORD"
 
       - name: Build and push "NimbleOpti".
         run: |
@@ -43,9 +42,6 @@ jobs:
           DOCKER_IMAGE_NAME="cronjob-n-o-a"
           docker buildx build . \
           --platform "$DOCKER_TARGET_PLATFORM" \
-          --tag $DOCKER_IMAGE_NAME:$IMAGE_TAG --tag $DOCKER_IMAGE_NAME:latest \
+          --tag $DOCKER_USERNAME/$DOCKER_IMAGE_NAME:$IMAGE_TAG --tag $DOCKER_USERNAME/$DOCKER_IMAGE_NAME:latest \
           --file cronjob/Dockerfile \
-          --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \
-          --build-arg VCS_REF=$(git rev-parse --short HEAD) \
-          --build-arg VERSION=0.1 \
           --output type=image,push=true

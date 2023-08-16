@@ -8,7 +8,7 @@ on:
     paths-ignore:
       - "README.md"
       - "cronjob/**"
-      - "NimbleOptiAdapter_ci_cronjob.yml"
+      - ".github/workflows/NimbleOptiAdapter_ci_cronjob.yml"
 jobs:
   build:
     runs-on: ubuntu-latest
