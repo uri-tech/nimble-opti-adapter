@@ -59,6 +59,71 @@ This function is like a cleaner. 🧹 When the certificate needs renewal and the
 
 
 ## 🚀 Deployment 🚀
+### 🏗 Building from Scratch:
+
+The following steps guide you through the process of cloning the repository, building the Docker container, and deploying the CronJob to your Kubernetes cluster.
+
+#### 1. Clone the Repository:
+
+To get started, first clone the repository to your local machine:
+
+```
+git clone https://github.com/uri-tech/nimble-opti-adapter.git
+```
+
+#### 2. Build the Docker Container:
+
+Before building the Docker container, ensure you have Docker installed and running on your machine. 
+
+Build the Docker image using the provided Dockerfile:
+
+```
+docker build -t "$docker_image_name:latest" -f cronjob/Dockerfile .
+```
+
+After a successful build, push the Docker image to your preferred container registry:
+
+```
+docker push "$docker_image_name:latest"
+```
+
+**Note**: Ensure you have the necessary permissions to push images to the specified container registry. If you're using Docker Hub, replace `$docker_image_name` with your Docker Hub username and the desired image name, e.g., `username/image-name`.
+
+#### 3. Deploy to Kubernetes Cluster:
+
+Before deploying, ensure you have `kubectl` installed and configured to communicate with your Kubernetes cluster.
+
+Apply the necessary RBAC permissions:
+
+```
+kubectl apply -f cronjob/deploy/default_rbac.yaml
+```
+
+Next, apply the configuration map which contains the CronJob's configuration:
+
+```
+kubectl apply -f cronjob/deploy/configmap.yaml
+```
+
+Finally, deploy the CronJob:
+
+```
+kubectl apply -f cronjob/deploy/cronjob.yaml
+```
+
+**Note**: Monitor the status of the CronJob using `kubectl` commands. For instance, to check the status of the CronJob, you can use:
+
+```
+kubectl get cronjobs -n ingress-modify-ns
+```
+
+
+#### Conclusion:
+
+By following the above steps, you should have successfully built the Docker container from the source code and deployed the CronJob to your Kubernetes cluster. Regularly check the logs and monitor the CronJob's performance to ensure smooth operations.
+
+
+## 🚀 Deployment in test environment 🚀
 
 ### 🔄 Installing/Updating the CronJob Only
 ###  Full Installation (including a Minikube cluster)
