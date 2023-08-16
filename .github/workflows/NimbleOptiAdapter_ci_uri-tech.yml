@@ -30,7 +30,6 @@ jobs:
           docker run --rm --privileged tonistiigi/binfmt --install all
           docker buildx create --use
           DOCKER_TARGET_PLATFORM="linux/arm64,linux/amd64"
-          DOCKER_USERNAME="nimbleopti"
           DOCKER_IMAGE_NAME="nimble-opti-adapter"
           docker buildx build . --platform $DOCKER_TARGET_PLATFORM \
           --build-arg BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ') \

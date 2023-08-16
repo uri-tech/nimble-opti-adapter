@@ -32,7 +32,7 @@ jobs:
         run: |
           docker login docker.io -u nimbleopti -p "$DOCKER_PASSWORD"
 
-      - name: Build and push "NimbleOpti".
+      - name: Build and push "NimbleOpti-cronjob".
         run: |
           IMAGE_TAG=$(date +%s)
           docker run --rm --privileged tonistiigi/binfmt --install all
