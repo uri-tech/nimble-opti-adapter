@@ -70,6 +70,7 @@ To get started, first clone the repository to your local machine:
 
 ```
 git clone https://github.com/uri-tech/nimble-opti-adapter.git
+cd nimble-opti-adapter
 ```
 
 #### 2. Build the Docker Container:
@@ -98,6 +99,12 @@ Apply the necessary RBAC permissions:
 
 ```
 kubectl apply -f cronjob/deploy/default_rbac.yaml
+for admin user:
+kubectl apply -f cronjob/deploy/default_rbac.yaml
+```
+or for admin user:
+```bash
+kubectl apply -f cronjob/deploy/admin_rbac.yaml
 ```
 
 Next, apply the configuration map which contains the CronJob's configuration:

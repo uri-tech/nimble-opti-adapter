@@ -13,11 +13,17 @@ spec:
     spec:
       template:
         spec:
+          securityContext: # Adding security context at the pod level
+            seccompProfile:
+              type: RuntimeDefault
           serviceAccountName: ingress-modify-sa
           containers:
             - name: ingress-modify-container
               image: nimbleopti/cronjob-n-o-a:latest
               imagePullPolicy: Always # IfNotPresent
+              securityContext: # Optionally, you can add security context at the container level
+                seccompProfile:
+                  type: RuntimeDefault
               # args:
               #   -
               # envFrom:

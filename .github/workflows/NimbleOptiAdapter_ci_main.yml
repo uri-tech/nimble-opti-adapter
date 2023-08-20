@@ -14,9 +14,23 @@ on:
     #   - "*"
     #   # Exclude README.md from triggering the workflow
     paths-ignore:
-      - "README.md"
+      - ".github/**"
+      - "bin/**"
       - "cronjob/**"
-      - ".github/workflows/NimbleOptiAdapter_ci_cronjob.yml"
+      - "diagrams/**"
+      - "example/**"
+      - "helm/**"
+      - "output/**"
+      - ".dockerignore"
+      - ".gitignore"
+      - "CODE_OF_CONDUCT.md"
+      - "CONTRIBUTING.md"
+      - "initialize.pdf"
+      - "README.md"
+      - "script-create.sh"
+      - "script-test.sh"
+      - "script-update.sh"
+
 
 jobs:
   build:
