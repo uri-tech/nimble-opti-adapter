@@ -1,10 +1,36 @@
+
 # 🚀 Ingress Annotation Modifier CronJob 🚀
 
 Welcome to the Ingress Annotation Modifier CronJob! This tool is designed to scan and modify annotations of `Ingress` resources across all Kubernetes namespaces daily. Its primary focus is on the annotation `"nginx.ingress.kubernetes.io/backend-protocol: HTTPS"`.
 
-<p align="center">
-  <img src="cronjob-diagram.svg" alt="CronJob diagrams">
-</p>
+```mermaid
+graph TB
+  Ingress[Scan All Ingress Resources]
+  Ingress --> ACME[Presence of ACME Challenge?]
+  ACME -- Yes --> startCert[startCertificateRenewalAudit]
+  startCert --> RemoveHTTPS[1. Removes HTTPS Annotation]
+  RemoveHTTPS --> Wait[2. Waits for ACME Challenge Path to Disappear or Timeout]
+  Wait --> ReinstateHTTPS[3. Reinstates HTTPS Annotation]
+  ReinstateHTTPS --> Success1[Certificate Renewed?]
+  Success1 -- Yes --> LogSuccess1[Log Success & Move to Next Ingress]
+  Success1 -- No --> ChangeSecret[Change Secret Name]
+  ChangeSecret --> Success2[Certificate Renewed?]
+  Success2 -- Yes --> LogSuccess2[Log Success & Move to Next Ingress]
+  Success2 -- No --> LogNames[Log Old & New Secret Names & Move to Next Ingress]
+  ACME -- No --> Admin[Admin User Permission?]
+  Admin -- Yes --> TimeCheck[Time Remaining <= Threshold?]
+  TimeCheck -- Yes --> DeleteSecret[Delete Ingress Secret & Wait 5s]
+  DeleteSecret --> Renew2[Attempt Certificate Renewal]
+  Renew2 --> Success3[Certificate Renewed?]
+  Success3 -- Yes --> LogSuccess3[Log Success & Move to Next Ingress]
+  Success3 -- No --> NotDue[Indicate Certificate Not Due for Renewal & Move to Next Ingress]
+  Admin -- No --> NextIngress[Move to Next Ingress]
+  LogSuccess1 --> NextIngress
+  LogNames --> NextIngress
+  LogSuccess3 --> NextIngress
+  NotDue --> NextIngress
+  NextIngress --> Summary[Summary: Log Total Ingress, Renewals, Successful Renewals]
+```
 
 ## 📂 Contents
 
