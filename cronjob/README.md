@@ -2,6 +2,10 @@
 
 Welcome to the Ingress Annotation Modifier CronJob! This tool is designed to scan and modify annotations of `Ingress` resources across all Kubernetes namespaces daily. Its primary focus is on the annotation `"nginx.ingress.kubernetes.io/backend-protocol: HTTPS"`.
 
+<p align="center">
+  <img src="cronjob-diagram.svg" alt="CronJob diagrams">
+</p>
+
 ## 📂 Contents
 
 1. [Function Descriptions](#-function-descriptions-)
@@ -22,9 +26,9 @@ This function is the heart of our watcher. 💓 It's like a diligent detective, 
 
 - **Presence of ACME Challenge**: 
   - If the Ingress has an ACME challenge path, the function will:
-    1. Initiate the certificate renewal process.
+    1. Initiate the certificate renewal process with the function `startCertificateRenewalAudit`.
     2. If the certificate is not renewed:
-       - Try changing the secret name associated with the Ingress to prompt the `cert-manager` to create a new certificate.
+       - Try changing the secret name associated with the Ingress to prompt the `cert-manager` to create a new certificate with the function `changeIngressSecretName`.
        - If the certificate is still not renewed after changing the secret name, log the old and new secret names.
        - If the certificate is successfully renewed after changing the secret name, log the success.
   

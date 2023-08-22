@@ -43,28 +43,11 @@ func NewIngressWatcher(clientKube kubernetes.Interface, ecfg *configenv.ConfigEn
 	// Create a new scheme for decoding into.
 	scheme := runtime.NewScheme()
 
-	// // assuming `v1` package has `AddToScheme` function
-	// if err := v1.AddToScheme(scheme); err != nil {
-	// 	logger.Fatalf("unable to add v1 scheme %v", err)
-	// 	return nil, err
-	// }
-
 	// Add client-go's scheme for core Kubernetes types
 	if err := clientgoscheme.AddToScheme(scheme); err != nil {
 		logger.Fatalf("unable to add client-go scheme %v", err)
 		return nil, err
 	}
-
-	// // Create a new dynamic RESTMapper. The RESTMapper is responsible for converting
-	// // group, version, and kind information to and from resource paths and scopes.
-	// // A dynamic RESTMapper can update itself automatically when new API types are registered.
-	// // 'cfg' provides the connection configuration to the Kubernetes cluster, and
-	// // 'http.DefaultClient' is the default HTTP client used for making API requests.
-	// mapper, err := apiutil.NewDynamicRESTMapper(cfg, http.DefaultClient)
-	// if err != nil {
-	// 	logger.Fatalf("unable to create RESTMapper: %v", err)
-	// 	return nil, err
-	// }
 
 	// Create a new client to Kubernetes API.
 	cl, err := client.New(cfg, client.Options{

@@ -5,7 +5,7 @@ old
 ./example/nimble-opti-adapter
 initialize.md
 initialize.pdf
-*.sh
+# *.sh
 
 # Binaries for programs and plugins
 *.exe
