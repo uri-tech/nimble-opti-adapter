@@ -1,5 +1,4 @@
-
-# 🚀 Ingress Annotation Modifier CronJob 🚀
+# 🚀 Ingress Annotation Modifier CronJob
 
 Welcome to the Ingress Annotation Modifier CronJob! This tool is designed to scan and modify annotations of `Ingress` resources across all Kubernetes namespaces daily. Its primary focus is on the annotation `"nginx.ingress.kubernetes.io/backend-protocol: HTTPS"`.
 
@@ -41,24 +40,24 @@ graph TB
 5. [Best Practices & Tips](#-best-practices--tips-)
 6. [Configuration Insights](#-configuration-insights-)
 
-
 ## 🛠 Function Descriptions 🛠
 
 ### `NewIngressWatcher`
+
 This function is the constructor for the `IngressWatcher` type. It's like the birth of our watcher! 🎉 When invoked, it sets up the necessary configurations, schemes, and clients to interact with the Kubernetes API. It's the starting point, ensuring our watcher is ready to monitor and act upon Ingress resources.
 
 ### `AuditIngressResources`
+
 This function is the heart of our watcher. 💓 It's like a diligent detective, scanning through all Ingress resources in the cluster. For each Ingress:
 
-- **Presence of ACME Challenge**: 
+- **Presence of ACME Challenge**:
   - If the Ingress has an ACME challenge path, the function will:
     1. Initiate the certificate renewal process with the function `startCertificateRenewalAudit`.
     2. If the certificate is not renewed:
        - Try changing the secret name associated with the Ingress to prompt the `cert-manager` to create a new certificate with the function `changeIngressSecretName`.
        - If the certificate is still not renewed after changing the secret name, log the old and new secret names.
        - If the certificate is successfully renewed after changing the secret name, log the success.
-  
-- **Absence of ACME Challenge and Admin User Permission**: 
+- **Absence of ACME Challenge and Admin User Permission**:
   - If there's no ACME challenge path but the function has admin user permissions:
     1. Calculate the time remaining before the certificate is due for renewal.
     2. If the remaining time is less than or equal to the defined threshold:
@@ -67,15 +66,17 @@ This function is the heart of our watcher. 💓 It's like a diligent detective, 
        - If the certificate is renewed successfully, log the success. Otherwise, indicate that the certificate is not yet due for renewal.
 
 **Summary**: At the end of its operations, `AuditIngressResources` provides logs detailing:
+
 - The total number of Ingress resources audited.
 - The number of Ingress resources that required renewal.
 - The number that were successfully renewed.
 
 This ensures a comprehensive overview and management of the Ingress resources.
 
-
 ### `startCertificateRenewalAudit`
+
 This function is the certificate's guardian. 🛡️ When an Ingress contains the `.well-known/acme-challenge`, this function steps in to renew the certificate. It:
+
 1. Removes the HTTPS annotation.
 2. Waits for the ACME challenge path to disappear or for a timeout.
 3. Once confirmed, it reinstates the HTTPS annotation.
@@ -83,13 +84,15 @@ This function is the certificate's guardian. 🛡️ When an Ingress contains th
 The function ensures that the certificate is renewed and up-to-date, keeping the traffic secure.
 
 ### `changeIngressSecretName`
+
 Think of this function as a name-changer. 🔄 When the certificate is about to expire, and the user doesn't have admin permissions (`ADMIN_USER_PERMISSION: "false"`), this function alters the secret's name in `ing.Spec.TLS`. By doing so, it prompts the cert-manager to create a new certificate. It checks if the name has a version suffix (like `-v1`). If not, it adds one. If it does, it increments it. It's a clever trick to get a fresh certificate without deleting the old one!
 
 ### `deleteIngressSecret`
+
 This function is like a cleaner. 🧹 When the certificate needs renewal and the user has admin permissions (`ADMIN_USER_PERMISSION: "true"`), this function deletes the associated Ingress secret. It ensures that old, soon-to-expire certificates are removed, making way for new ones.
 
-
 ## 🚀 Deployment 🚀
+
 ### 🏗 Building from Scratch:
 
 The following steps guide you through the process of cloning the repository, building the Docker container, and deploying the CronJob to your Kubernetes cluster.
@@ -105,7 +108,19 @@ cd nimble-opti-adapter
 
 #### 2. Build the Docker Container:
 
-Before building the Docker container, ensure you have Docker installed and running on your machine. 
+Before building the Docker container, ensure you have Docker installed and running on your machine.
+
+For mac using homeebrew
+
+```
+
+```
+
+Difine the name of the image:
+
+```
+docker_image_name="cronjob-n-o-a"
+```
 
 Build the Docker image using the provided Dockerfile:
 
@@ -129,10 +144,10 @@ Apply the necessary RBAC permissions:
 
 ```
 kubectl apply -f cronjob/deploy/default_rbac.yaml
-for admin user:
-kubectl apply -f cronjob/deploy/default_rbac.yaml
 ```
+
 or for admin user:
+
 ```bash
 kubectl apply -f cronjob/deploy/admin_rbac.yaml
 ```
@@ -155,19 +170,20 @@ kubectl apply -f cronjob/deploy/cronjob.yaml
 kubectl get cronjobs -n ingress-modify-ns
 ```
 
-
 #### Conclusion:
 
 By following the above steps, you should have successfully built the Docker container from the source code and deployed the CronJob to your Kubernetes cluster. Regularly check the logs and monitor the CronJob's performance to ensure smooth operations.
 
-
 ## 🚀 Deployment in test environment 🚀
 
 ### 🔄 Installing/Updating the CronJob Only
-###  Full Installation (including a Minikube cluster)
+
+### Full Installation (including a Minikube cluster)
+
 The `cronjob-create.sh` script provides a comprehensive setup. From initializing a Minikube cluster to applying the Kubernetes configurations, it's got you covered!
 
 🔧 **What it does**:
+
 - Initializes a Minikube cluster.
 - Sets up Helm for cert-manager.
 - Enables Minikube ingress.
@@ -177,35 +193,42 @@ The `cronjob-create.sh` script provides a comprehensive setup. From initializing
 - Applies the Kubernetes configurations.
 
 🏃 **To deploy, simply run**:
+
 ```
-./cronjob-create.sh
+./cronjob/cronjob-create.sh
 ```
 
 ### 🔄 Installing/Updating the CronJob Only
+
 The `cronjob-update.sh` script is your go-to for updating the CronJob. It's efficient, removing the old configuration and applying the new one after rebuilding the Docker image.
 
 🔧 **What it does**:
+
 - Removes the old configuration.
 - Rebuilds and pushes the Docker image.
 - Applies the updated Kubernetes configurations.
 
 🏃 **To update, execute**:
+
 ```
-./cronjob-update.sh
+./cronjob/cronjob-update.sh
 ```
 
 ### 🛠️ Script Options:
+
 Both scripts support the `-e` option to set environment variables. Here's how you can use it:
 
 - **Setting the Image Tag**:
+
 ```
-./cronjob-create.sh -e IMAGE_TAG=v2.0.0
-./cronjob-update.sh -e IMAGE_TAG=v2.0.0
+./cronjob/cronjob-create.sh -e IMAGE_TAG=v2.0.0
+./cronjob/cronjob-update.sh -e IMAGE_TAG=v2.0.0
 ```
 
 - **Setting the Cert Manager Version**:
+
 ```
-./cronjob-create.sh -e CERT_MANAGER_VERSION=v1.12.0
+./cronjob/cronjob-create.sh -e CERT_MANAGER_VERSION=v1.12.0
 ```
 
 - **Other options**:
@@ -215,15 +238,16 @@ Both scripts support the `-e` option to set environment variables. Here's how yo
   - `ADMIN_CONFIG`: Set to `true` or `false` to control admin configurations.
 
 For example, to set the Docker username while creating:
+
 ```
-./cronjob-create.sh -e DOCKER_USERNAME=myusername
+./cronjob/cronjob-create.sh -e DOCKER_USERNAME=myusername
 ```
 
 Remember, you can combine multiple environment variables by separating them with spaces:
-```
-./cronjob-create.sh -e IMAGE_TAG=v2.0.0 -e DOCKER_USERNAME=myusername -e CERT_MANAGER_VERSION=v1.12.0
-```
 
+```
+./cronjob/cronjob-create.sh -e IMAGE_TAG=v2.0.0 -e DOCKER_USERNAME=myusername -e CERT_MANAGER_VERSION=v1.12.0
+```
 
 ## 📊 Monitoring & Logging 📊
 
