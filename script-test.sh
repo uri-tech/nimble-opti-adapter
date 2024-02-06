@@ -61,8 +61,7 @@ metadata:
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
     nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
-    acme.cert-manager.io/http01-edit-in-place: 'true'
-    kubernetes.io/tls-acme: 'true'
+    acme.cert-manager.io/http01-edit-in-place: 'true' # allows the cert-manager to edit the Ingress resource in place to solve the challenge, rather than creating additional resources.
 spec:
   ingressClassName: nginx
   tls:

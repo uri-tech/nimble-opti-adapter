@@ -32,7 +32,7 @@ test_code="${TEST_CODE:-true}"
 
 # Run Go tests
 if [ "$test_code" = "true" ]; then
-  echo "Running Go tests..."
+  echo "Running Go test files..."
   go test ./... || {
     echo "Go tests failed"
     exit 1
@@ -61,6 +61,7 @@ helm repo update
 
 echo "Enabling Minikube ingress..."
 minikube addons enable ingress
+# clean up after the initialization process and ignore errors (with || true)
 kubectl delete job -n ingress-nginx ingress-nginx-admission-create || true
 kubectl delete job -n ingress-nginx ingress-nginx-admission-patch || true
 
@@ -73,6 +74,8 @@ helm install cert-manager jetstack/cert-manager \
   --set defaultIssuerName=letsencrypt-prod \
   --set defaultIssuerKind=ClusterIssuer \
   --wait
+# defaultIssuerName=letsencrypt-prod: sets the default issuer to be used when creating new certificate resources.
+# defaultIssuerKind=ClusterIssuer: allowing for a broader scope of certificate management.
 
 # Apply letsencrypt cluster issuer
 echo "Configuring LetsEncrypt Cluster Issuer..."
@@ -85,15 +88,30 @@ spec:
   acme:
     email: smart.apartment.uri@gmail.com
     privateKeySecretRef:
-      name: letsencrypt-prod
+      name: acme-letsencrypt-prod
     server: https://acme-v02.api.letsencrypt.org/directory
     solvers:
     - http01:
         ingress:
           class: nginx
 EOF
+# ACME Account Registration: When you create a ClusterIssuer and it is used for the first time to obtain a certificate, cert-manager will register an ACME account with the email specified in the ClusterIssuer definition and generate a private key for that account.
+# Secret Creation: cert-manager will then create a Kubernetes secret (in this case, acme-letsencrypt-prod) in the same namespace as the cert-manager pod. This secret will contain the generated private key.
+# Certificate Issuance: The private key in the acme-letsencrypt-prod secret is used for subsequent communications with the ACME server (Let's Encrypt) for operations like proving domains ownership and requesting certificates.
+# http01 is one of the challenge types used by the Automated Certificate Management Environment (ACME) protocol to verify domain ownership.
+# http01:
+#   1. Challenge Initiation: The ACME client (cert-manager) requests a certificate for a domain from the ACME server (like Let's Encrypt) and agrees to perform an http01 challenge to prove control over the domain.
+#   2. Token and File Creation: The ACME server provides a token to the client. The client then creates a file containing a specific value derived from this token and its account key.
+#   3. File Placement: The client places this file on the web server at a specific URL under the /.well-known/acme-challenge/ directory. For example, for example.com domain, the file be accessible at http://example.com/.well-known/acme-challenge/<token>.
+#   4. Verification by ACME Server: The ACME server then makes an HTTP request to the URL where the file was placed. If the server finds the file and its contents match what's expected, the domain ownership is considered verified.
+#   5. Certificate Issuance: Once all requested domains are verified and the challenge's status is updated to indicate success.
+#   6. Polling for Validation Status: The ACME client periodically sends requests to the ACME server to check the status of the challenge.
+#   7. Requesting the Certificate: After all challenges are successfully validated, the ACME client sends a final request to the ACME server to issue the certificate for the validated domains.
+#   8. Certificate Issuance: The ACME server issues the certificate and provides it to the client in the response to the final request. The ACME client then retrieves the certificate and stores them.
+#   9. Automatic Renewal: The ACME client is also responsible for monitoring the certificate's expiration and will automatically repeat the process to renew the certificate when it's nearing expiration.
+# ingress.class: nginx - it will manage the challenge process through the Ingress resources.
 
-echo "Making manifests..."
+echo "Making manifests files of the operator according to the makefile..."
 make manifests
 
 echo "Installing..."
@@ -119,7 +137,7 @@ case "$build_platform" in
   ;;
 esac
 
-echo "Deploying..."
+echo "Deploying the image to docker hub..."
 make deploy IMG=$image_name:latest
 
 # Allow the system a moment to process the previous command

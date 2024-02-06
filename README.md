@@ -32,13 +32,15 @@ The operator monitors the creation and modification of both CustomResourceDefini
 1. 🚫 The operator is currently configured to watch for creation or modification events on `NimbleOpti` CRDs and `ingress`.
 
 2. 🚦 Upon Ingress resource events, the operator verifies the existence of the `nimble.opti.adapter/enabled: "true"` label:
+
    - In the absence of this label, the operator remains passive.
-   - If the label is present, it validates the existence of a `NimbleOpti` CRD within the same namespace. 
-     - If the CRD is missing, a new `NimbleOpti` CRD is instantiated with default values. 
+   - If the label is present, it validates the existence of a `NimbleOpti` CRD within the same namespace.
+     - If the CRD is missing, a new `NimbleOpti` CRD is instantiated with default values.
      - If the CRD already exists, the operator scans for any path in `spec.rules[].http.paths[].path` containing `.well-known/acme-challenge`.
        - If found, the certificate renewal process for the Ingress resource is triggered.
 
 3. 📆 The operator runs a daily audit of all Ingress resources with the `nimble.opti.adapter/enabled: "true"` label and associated `NimbleOpti` CRD in the same namespace:
+
    - In the absence of matching resources, no action is taken.
    - If matches are found:
      - If the ingress manifest the presence of .well-known/acme-challenge within the spec.rules[].http.paths[].path attribute, the operator shall initiate the certificate renewal process.
@@ -49,8 +51,8 @@ The operator monitors the creation and modification of both CustomResourceDefini
    - A timer kicks in, waiting for the absence of `spec.rules[].http.paths[].path` containing `.well-known/acme-challenge` or for the lapse of the `AnnotationRemovalDelay` specified in the `NimbleOpti` CRD.
    - The duration of annotation updates during renewal is captured as `nimble-opti-adapter_annotation_updates_duration_seconds` and dispatched to a Prometheus endpoint.
    - The `nginx.ingress.kubernetes.io/backend-protocol: HTTPS` annotation is reinstated on the Ingress resource.
-   - If the  `.well-known/acme-challenge` is not exist then counter `nimble-opti-adapter_certificate_renewals_total` is incremented and sent to a Prometheus endpoint.
-<!-- ![nimble-opti-adapter Diagram](diagram.png) -->
+   - If the `.well-known/acme-challenge` is not exist then counter `nimble-opti-adapter_certificate_renewals_total` is incremented and sent to a Prometheus endpoint.
+   <!-- ![nimble-opti-adapter Diagram](diagram.png) -->
 
 ## 🌟 Features
 
