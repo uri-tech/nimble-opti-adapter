@@ -88,17 +88,27 @@ git clone https://github.com/uri-tech/nimble-opti-adapter.git
 cd nimble-opti-adapter
 ```
 
-### Step 2: Install the operator using Helm
+### Step 2: Install the operator
+
+#### Install the operator using the makefile with Kustomize
+
+```bash
+make manifests # Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+make install # Install CRDs into the K8s cluster specified in ~/.kube/config.
+make deploy IMG=nimbleopti/nimble-opti-adapter:latest # Deploy controller to the K8s cluster specified in ~/.kube/config.
+```
+
+#### Install the operator using Helm
 
 ```bash
 helm install nimble-opti-adapter ./helm/nimble-opti-adapterconfig
 ```
 
-### Step 3: Modify the operator
+#### Modify the operator
 
 To modify the operator, edit the Helm chart templates or values.yaml file in the helm/nimble-opti-adapterconfig directory.
 
-### Step 4: Update the operator using Helm
+#### Update the operator using Helm
 
 Repackage the Helm chart and upgrade the release with the following commands:
 
@@ -108,7 +118,7 @@ helm package nimble-opti-adapterconfig
 helm upgrade nimble-opti-adapter ./nimble-opti-adapterconfig-0.1.0.tgz
 ```
 
-## ⚙️ Configuration
+#### ⚙️ Configuration
 
 Edit the `values.yaml` file in the `helm/nimble-opti-adapterconfig` directory to customize the following parameters:
 

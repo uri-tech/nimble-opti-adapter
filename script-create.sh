@@ -83,7 +83,7 @@ kubectl apply -f - <<EOF
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
 metadata:
-  name: letsencrypt-prod
+  name: clusterissuer-letsencrypt-http01
 spec:
   acme:
     email: smart.apartment.uri@gmail.com
@@ -95,6 +95,7 @@ spec:
         ingress:
           class: nginx
 EOF
+
 # ACME Account Registration: When you create a ClusterIssuer and it is used for the first time to obtain a certificate, cert-manager will register an ACME account with the email specified in the ClusterIssuer definition and generate a private key for that account.
 # Secret Creation: cert-manager will then create a Kubernetes secret (in this case, acme-letsencrypt-prod) in the same namespace as the cert-manager pod. This secret will contain the generated private key.
 # Certificate Issuance: The private key in the acme-letsencrypt-prod secret is used for subsequent communications with the ACME server (Let's Encrypt) for operations like proving domains ownership and requesting certificates.
@@ -114,7 +115,7 @@ EOF
 echo "Making manifests files of the operator according to the makefile..."
 make manifests
 
-echo "Installing..."
+echo "Installing the operator..."
 make install
 
 # Docker operations
@@ -165,6 +166,38 @@ spec:
   selector:
     control-plane: controller-manager
   type: ClusterIP
+EOF
+
+# Create ingress for testing
+cat <<EOF | kubectl apply -f -
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-example
+  namespace: default
+  labels:
+    nimble.opti.adapter/enabled: "true"
+  annotations:
+    cert-manager.io/cluster-issuer: clusterissuer-letsencrypt-http01 # Use the cluster issuer created earlier for automatic certificate management
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS" # passthrough the encripted HTTPS traffic as is to the backend
+    # acme.cert-manager.io/http01-edit-in-place: 'true' # This annotation is not required for cert-manager v1.11.0
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - example.127.0.0.1.nip.io # Replace with the domain you want to expose
+      secretName: tls-letsencrypt-example
+  rules:
+    - host: example.127.0.0.1.nip.io # Replace with the domain you want to expose
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: service-example # Replace with the name of the service you want to expose
+                port:
+                  number: 443
 EOF
 
 # Handle Minikube dashboard

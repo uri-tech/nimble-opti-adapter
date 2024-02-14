@@ -60,7 +60,7 @@ helm repo add jetstack https://charts.jetstack.io
 helm repo update
 ```
 
-<i><b>Install Install cert-manager with CustomResourceDefinitions:</i></b>
+<i><b> Install cert-manager with CustomResourceDefinitions:</i></b>
 
 cert-manager requires a number of CRD resources, which can be installed manually using kubectl, or using the installCRDs option when installing the Helm chart.
 
@@ -87,7 +87,38 @@ The ingress controller can be installed through minikube's addons system:
 minikube addons enable ingress
 ```
 
-## Step 4: Clone the nimble-opti-adapter repository
+When you are not using minikube
+
+```bash
+helm upgrade --install ingress-nginx ingress-nginx \
+  --repo https://kubernetes.github.io/ingress-nginx \
+  --namespace ingress-nginx --create-namespace
+# or using YAML manifest
+k apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.2/deploy/static/provider/cloud/deploy.yaml
+```
+
+## Step 4: Create letsencrypt cluster issuer
+
+```bash
+k apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: clusterissuer-letsencrypt-http01
+spec:
+  acme:
+    email: <YOUR EMAIL> # replace with your email
+    privateKeySecretRef:
+      name: acme-letsencrypt-prod
+    server: https://acme-v02.api.letsencrypt.org/directory
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+EOF
+```
+
+## Step 5: Clone the nimble-opti-adapter repository
 
 Clone the nimble-opti-adapter repository to your local machine:
 
@@ -97,7 +128,17 @@ git clone -b main https://github.com/uri-tech/nimble-opti-adapter.git
 cd nimble-opti-adapter
 ```
 
-## Step 5: Render the templates and install the operator using Helm
+## Step 6: Render the templates and install the operator
+
+### Using makefile with Kustomize (recomended)
+
+```bash
+make manifests # Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
+make install # Install CRDs into the K8s cluster specified in ~/.kube/config.
+make deploy IMG=nimbleopti/nimble-opti-adapter:latest # Deploy controller to the K8s cluster specified in ~/.kube/config.
+```
+
+### Using Helm
 
 Create an output directory for saving the rendered templates:
 
@@ -132,7 +173,7 @@ k -n nimble-opti-adapter describe pod <pod_name>
 k -n nimble-opti-adapter logs <pod_name> <container_name>
 ```
 
-## Step 6: Label the namespace
+## Step 7: Label the namespace
 
 Label the default namespace so that the operator will manage certificates in it:
 
@@ -140,11 +181,11 @@ Label the default namespace so that the operator will manage certificates in it:
 k label namespace default nimble.opti.adapter/enabled=true
 ```
 
-## Step 7: Create a nimble-opti-adapterConfig custom resource
+## Step 8: Create a nimble-opti-adapterConfig custom resource
 
 Create a `nimble-opti-adapter.yaml` file with the following content:
 
-```ymal
+```yml
 apiVersion: nimble-opti-adapter.example.com/v1alpha1
 kind: NimbleOptiConfig
 metadata:
@@ -152,7 +193,6 @@ metadata:
 spec:
   certificateRenewalThreshold: 30
   annotationRemovalDelay: 10
-  
 ```
 
 Apply the configuration:
@@ -161,34 +201,39 @@ Apply the configuration:
 k apply -f nimble-opti-adapter.yaml
 ```
 
-## Step 8: Test the operator
+## Step 9: Test the operator
 
 To test the operator, you can create an example ingress resource that requires TLS communication. Save the following content in a file named `example-ingress.yaml`:
 
-```ymal
+```yml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: example-ingress
+  name: ingress-example
+  namespace: default
+  labels:
+    nimble.opti.adapter/enabled: "true"
   annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-staging"
-    nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+    cert-manager.io/cluster-issuer: clusterissuer-letsencrypt-http01 # Use the cluster issuer created earlier for automatic certificate management
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS" # passthrough the encripted HTTPS traffic as is to the backend
+    # acme.cert-manager.io/http01-edit-in-place: 'true' # This annotation is not required for cert-manager v1.11.0
 spec:
+  ingressClassName: nginx
   tls:
-  - hosts:
-    - example.com
-    secretName: example-tls
+    - hosts:
+        - example.127.0.0.1.nip.io # Replace with the domain you want to expose
+      secretName: tls-letsencrypt-example # create secret in the same namespace as the ingress that contain the tls.crt and tls.key of the domains
   rules:
-  - host: example.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: example-service
-            port:
-              number: 80
+    - host: example.127.0.0.1.nip.io # Replace with the domain you want to expose
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: service-example # Replace with the name of the service you want to expose
+                port:
+                  number: 443
 ```
 
 Apply the ingress resource:
@@ -203,7 +248,7 @@ Apply the ingress resource:
 k logs -f -l app.kubernetes.io/name=nimble-opti-adapter
 ```
 
-## Step 9: Cleanup
+## Step 10: Cleanup
 
 Once you've finished testing, you can delete the resources and stop Minikube:
 
