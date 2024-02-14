@@ -99,7 +99,7 @@ k apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller
 
 ## Step 4: Create letsencrypt cluster issuer
 
-```bash
+```yml
 k apply -f - <<EOF
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -107,14 +107,14 @@ metadata:
   name: clusterissuer-letsencrypt-http01
 spec:
   acme:
-    email: <YOUR EMAIL> # replace with your email
+    email: <YOUR EMAIL> # cert-manager will register an ACME account with the email specified.
     privateKeySecretRef:
-      name: acme-letsencrypt-prod
+      name: acme-letsencrypt-prod # create secret (acme-letsencrypt-prod) in the same namespace as the cert-manager pod. This secret will contain the generated private key for that account which subsequent communications with the ACME server (Let's Encrypt) for operations like proving domains ownership and requesting certificates.
     server: https://acme-v02.api.letsencrypt.org/directory
     solvers:
-    - http01:
+    - http01: # http01 is one of the challenge types used by the Automated Certificate Management Environment (ACME) protocol to verify domain ownership.
         ingress:
-          class: nginx
+          class: nginx # For managing the challenge process through the Ingress resources
 EOF
 ```
 
@@ -214,24 +214,24 @@ metadata:
   labels:
     nimble.opti.adapter/enabled: "true"
   annotations:
-    cert-manager.io/cluster-issuer: clusterissuer-letsencrypt-http01 # Use the cluster issuer created earlier for automatic certificate management
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS" # passthrough the encripted HTTPS traffic as is to the backend
-    # acme.cert-manager.io/http01-edit-in-place: 'true' # This annotation is not required for cert-manager v1.11.0
+    cert-manager.io/cluster-issuer: clusterissuer-letsencrypt-http01 # Use the cluster issuer created earlier for automatic certificate management.
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS" # Passthrough the encripted HTTPS traffic as is to the backend.
+    # acme.cert-manager.io/http01-edit-in-place: 'true' # This annotation is not required for cert-manager v1.11.0.
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - example.127.0.0.1.nip.io # Replace with the domain you want to expose
-      secretName: tls-letsencrypt-example # create secret in the same namespace as the ingress that contain the tls.crt and tls.key of the domains
+        - example.127.0.0.1.nip.io # Replace with the domain you want to expose.
+      secretName: tls-letsencrypt-example # Create secret in the same namespace as the ingress that contain the tls.crt and tls.key of the domains.
   rules:
-    - host: example.127.0.0.1.nip.io # Replace with the domain you want to expose
+    - host: example.127.0.0.1.nip.io # Replace with the domain you want to expose.
       http:
         paths:
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: service-example # Replace with the name of the service you want to expose
+                name: service-example # Replace with the name of the service you want to expose.
                 port:
                   number: 443
 ```
