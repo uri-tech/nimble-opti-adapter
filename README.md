@@ -90,7 +90,7 @@ cd nimble-opti-adapter
 
 ### Step 2: Install the operator
 
-#### Install the operator using the makefile with Kustomize
+#### Install the operator using the makefile with Kustomize (recomended)
 
 ```bash
 make manifests # Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
